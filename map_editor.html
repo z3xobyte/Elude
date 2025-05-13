@@ -456,6 +456,16 @@
                             patternAlternate: false,
                             initialSide: 0,
                         },
+                        recursive_bullet_boss: {
+                            count: 0,
+                            radius: 25,
+                            minSpeed: 2,
+                            maxSpeed: 4,
+                            shootCooldown: 120,
+                            bulletRadius: 8,
+                            bulletSpeed: 4,
+                            recursionLevels: 2
+                        },
                     },
                 },
                 teleporterCodes: [],
@@ -681,6 +691,29 @@
                                     Left: 3,
                                 })
                                 .name("Initial Side"),
+                        );
+                        break;
+                        
+                    case "recursive_bullet_boss":
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "shootCooldown", 10, 500, 10)
+                                .name("Shoot Cooldown"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "bulletRadius", 2, 20, 1)
+                                .name("Bullet Radius"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "bulletSpeed", 1, 20, 1)
+                                .name("Bullet Speed"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "recursionLevels", 1, 5, 1)
+                                .name("Recursion Levels"),
                         );
                         break;
                 }
@@ -1495,6 +1528,16 @@
                                     patternAlternate: false,
                                     initialSide: 0,
                                 },
+                                recursive_bullet_boss: {
+                                    count: 0,
+                                    radius: 25,
+                                    minSpeed: 2,
+                                    maxSpeed: 4,
+                                    shootCooldown: 120,
+                                    bulletRadius: 8,
+                                    bulletSpeed: 4,
+                                    recursionLevels: 2
+                                },
                             },
                         };
                     }
@@ -1507,6 +1550,7 @@
                         "homing",
                         "void_crawler",
                         "wall",
+                        "recursive_bullet_boss"
                     ];
                 
                     requiredTypes.forEach((type) => {
@@ -1718,6 +1762,16 @@
                                 moveClockwise: true,
                                 patternAlternate: false,
                                 initialSide: 0,
+                            },
+                            recursive_bullet_boss: {
+                                count: 0,
+                                radius: 25,
+                                minSpeed: 2,
+                                maxSpeed: 4,
+                                shootCooldown: 120,
+                                bulletRadius: 8,
+                                bulletSpeed: 4,
+                                recursionLevels: 2
                             },
                         },
                     },

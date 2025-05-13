@@ -512,8 +512,11 @@ export class Renderer {
     this.ctx.lineTo(-this.arrowSize / 2, -this.arrowSize * 0.7);
     this.ctx.closePath();
 
-    this.ctx.strokeStyle = color;
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.strokeStyle = "#bdbdbd";
     this.ctx.lineWidth = 2;
+
+    this.ctx.fill();
     this.ctx.stroke();
 
     this.ctx.restore();

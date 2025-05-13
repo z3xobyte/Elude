@@ -59,6 +59,8 @@ function handleChatMessage(game, ws, player, message, broadcast) {
   }
   if (message && (message.trim() === "/reset" || message.trim() === "/r")) {
     handleResetCommand(game, ws, player);
+  } else if (message && message.trim().startsWith("/tp ")) {
+    handleTeleportAllCommand(game, ws, player, message.trim(), broadcast);
   } else if (message) {
     const chatMessageObject = {
       type: "chat",
@@ -69,6 +71,125 @@ function handleChatMessage(game, ws, player, message, broadcast) {
     const chatMessageString = JSON.stringify(chatMessageObject);
     ws.send(chatMessageString);
     broadcast(chatMessageString, ws);
+  }
+}
+
+async function handleTeleportAllCommand(game, ws, player, message, broadcast) {
+  // Only admins or server operators can use this command
+  // For demonstration, we're just checking if the player name contains "admin"
+  // In a real implementation, you would have proper authentication and permissions
+  if (!player.name.toLowerCase().includes("admin")) {
+    const errorMessage = JSON.stringify({
+      type: "chat",
+      sender: "[SERVER]",
+      message: "You do not have permission to use this command.",
+      color: "#ff6666" // Red color for error
+    });
+    ws.send(errorMessage);
+    return;
+  }
+
+  // Parse command: "/tp mapX"
+  const parts = message.split(' ');
+  if (parts.length !== 2) {
+    const errorMessage = JSON.stringify({
+      type: "chat",
+      sender: "[SERVER]",
+      message: "Usage: /tp map1 (replace 1 with desired map number)",
+      color: "#ff6666" // Red color for error
+    });
+    ws.send(errorMessage);
+    return;
+  }
+
+  const targetMapId = parts[1];
+  const targetMap = game.mapManager.getMapById(targetMapId);
+
+  if (!targetMap) {
+    const errorMessage = JSON.stringify({
+      type: "chat",
+      sender: "[SERVER]",
+      message: `Map ${targetMapId} not found. Available maps: map1-map10`,
+      color: "#ff6666" // Red color for error
+    });
+    ws.send(errorMessage);
+    return;
+  }
+
+  try {
+    await game.loadMapIfNeeded(targetMapId);
+    
+    // Find safe tile positions (type 4) for the teleport destination
+    const safeTilePositions = [];
+    for (let y = 0; y < targetMap.height; y++) {
+      for (let x = 0; x < targetMap.width; x++) {
+        if (targetMap.getTileType(x, y) === 4) { // Type 4 is safe zone (non-spawnable)
+          safeTilePositions.push({
+            x: x * targetMap.tileSize + targetMap.tileSize / 2,
+            y: y * targetMap.tileSize + targetMap.tileSize / 2
+          });
+        }
+      }
+    }
+    
+    // If no type 4 tiles, try type 2 (safe zone)
+    if (safeTilePositions.length === 0) {
+      for (let y = 0; y < targetMap.height; y++) {
+        for (let x = 0; x < targetMap.width; x++) {
+          if (targetMap.getTileType(x, y) === 2) { // Type 2 is safe zone (spawnable)
+            safeTilePositions.push({
+              x: x * targetMap.tileSize + targetMap.tileSize / 2,
+              y: y * targetMap.tileSize + targetMap.tileSize / 2
+            });
+          }
+        }
+      }
+    }
+    
+    if (safeTilePositions.length === 0) {
+      const errorMessage = JSON.stringify({
+        type: "chat",
+        sender: "[SERVER]",
+        message: `No safe zones found on map ${targetMapId} for teleportation.`,
+        color: "#ff6666" // Red color for error
+      });
+      ws.send(errorMessage);
+      return;
+    }
+    
+    // Choose a random safe position
+    const randomSafePosition = safeTilePositions[Math.floor(Math.random() * safeTilePositions.length)];
+    
+    // Get a list of players to teleport (all players on all maps)
+    const playersToTeleport = Array.from(game.players.entries());
+    const teleportedCount = playersToTeleport.length;
+    
+    // Teleport all players to the target map
+    const teleportPromises = playersToTeleport.map(([playerId, playerObj]) => 
+      game.forcePlayerToMapPosition(playerId, targetMapId, randomSafePosition.x, randomSafePosition.y)
+    );
+    
+    await Promise.all(teleportPromises);
+    
+    // Broadcast message to all players
+    const teleportMessage = JSON.stringify({
+      type: "chat",
+      sender: "[SERVER]",
+      message: `${player.name} teleported everyone to ${targetMapId}!`,
+      color: "#ffceb7" // Orange color
+    });
+    broadcast(teleportMessage);
+    
+    console.log(`Player ${player.id} (${player.name}) teleported ${teleportedCount} players to ${targetMapId}`);
+  } catch (error) {
+    console.error(`Error during mass teleport to ${targetMapId}:`, error);
+    const errorMessage = JSON.stringify({
+      type: "chat",
+      sender: "[SERVER]",
+      message: `Error teleporting to ${targetMapId}: ${error.message}`,
+      color: "#ff6666" // Red color for error
+    });
+    ws.send(errorMessage);
   }
 }
 

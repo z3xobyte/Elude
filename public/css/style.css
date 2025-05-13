@@ -1,0 +1,83 @@
+#intro-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+  z-index: 1000; /* Ensure it's above canvas but below menu if needed */
+  overflow: hidden;
+  display: none; /* Initially hidden, shown by JS */
+  pointer-events: none; /* Allow clicks through if needed, though it covers everything */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Baloo Paaji 2', sans-serif;
+}
+
+/* Particles.js container - full overlay size */
+#particles-js {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  opacity: 0; /* Start invisible, will be animated */
+  z-index: 1; /* Lower than other elements */
+  pointer-events: none; /* Don't intercept clicks */
+}
+
+#intro-orbit-container {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  /* Container takes full space, children are positioned absolutely */
+  pointer-events: none;
+}
+
+#intro-player {
+  position: absolute; /* Centered by parent flex */
+  width: 135px; /* 1.5x bigger than original size (was 90px) */
+  height: 135px;
+  background-color: #ddd; /* Default player color (can be changed by JS later if needed) */
+  border-radius: 50%;
+  border: 2px solid #bdbdbd; /* Outline similar to game */
+  box-shadow: 0 0 15px #fff, 0 0 25px #aaa, 0 0 35px rgba(255,255,255,0.5); /* Enhanced glow effect */
+  opacity: 0;
+  transform: scale(0.5);
+  z-index: 100; /* Player above enemies */
+  left: 50%;
+  top: 50%;
+  margin-left: -67.5px; /* Half of the new width */
+  margin-top: -67.5px; /* Half of the new height */
+}
+
+.intro-enemy {
+  position: absolute; /* Positioned by JS */
+  width: 20px; /* Base size */
+  height: 20px;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0);
+  /* Box shadow for a slight glow */
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+  /* Will be positioned relative to the center */
+  left: 50%;
+  top: 50%;
+  transform-origin: center center;
+}
+
+#intro-text {
+  position: absolute;
+  /* Centered by parent flex, adjusted relative to player */
+  color: #ffffff;
+  font-size: 20px; /* Slightly larger */
+  font-family: 'Baloo Paaji 2', sans-serif;
+  white-space: nowrap;
+  opacity: 0; /* Initially hidden */
+  text-shadow: 1px 1px 2px #000;
+  z-index: 11; /* Above player */
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -100%); /* Center horizontally, position above vertically */
+  margin-top: -10px; /* Much closer to player (was -25px) */
+} 

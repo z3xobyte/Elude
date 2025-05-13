@@ -476,6 +476,7 @@
             
             let currentMapIndex = 0;
             let selectedTeleporter = null; // For linking teleporters
+            let isLinkingTeleporter = false; // Flag to track when actively linking teleporters
             
             // Initialize variables
             let scale = 1;
@@ -486,6 +487,19 @@
             let currentTeleporterIndex = -1;
             let isDrawing = false;
             let symmetricDrawing = false;
+            
+            // Camera and view control variables
+            let cameraOffset = { x: 0, y: 0 };
+            let isDragging = false;
+            let dragStart = { x: 0, y: 0 };
+            let keys = {
+                w: false,
+                a: false,
+                s: false,
+                d: false
+            };
+            const cameraSpeed = 10;
+            
             const gui = new dat.GUI({ autoPlace: true, width: 350 });
             gui.domElement.style.position = "absolute";
             gui.domElement.style.top = "50px";
@@ -761,15 +775,15 @@
                     const canvas = document.createElement("canvas");
                     canvas.className = "map-canvas";
                     canvas.dataset.mapIndex = index;
-                    canvas.width = map.width * map.tileSize * scale;
-                    canvas.height = map.height * map.tileSize * scale;
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight - 100; // Adjust for toolbar
                     canvas.style.cursor = "pointer";
                     
                     // Add event listeners
                     canvas.addEventListener("mousedown", handleMouseDown);
                     canvas.addEventListener("mousemove", handleMouseMove);
-                    canvas.addEventListener("mouseup", () => isDrawing = false);
-                    canvas.addEventListener("mouseleave", () => isDrawing = false);
+                    canvas.addEventListener("mouseup", handleMouseUp);
+                    canvas.addEventListener("mouseleave", handleMouseLeave);
                     canvas.addEventListener("wheel", handleWheel, { passive: false });
                     
                     mapContainer.appendChild(canvas);
@@ -790,7 +804,7 @@
                 zoomInBtn.textContent = "+";
                 zoomInBtn.addEventListener("click", () => {
                     scale = Math.min(scale + 0.1, 3);
-                    resizeCanvases();
+                    drawAllMaps();
                 });
                 
                 const zoomOutBtn = document.createElement("button");
@@ -799,15 +813,29 @@
                 zoomOutBtn.textContent = "-";
                 zoomOutBtn.addEventListener("click", () => {
                     scale = Math.max(scale - 0.1, 0.2);
-                    resizeCanvases();
+                    drawAllMaps();
+                });
+                
+                const resetViewBtn = document.createElement("button");
+                resetViewBtn.className = "zoom-btn";
+                resetViewBtn.id = "resetView";
+                resetViewBtn.textContent = "⟳";
+                resetViewBtn.title = "Reset View";
+                resetViewBtn.addEventListener("click", () => {
+                    cameraOffset = { x: 0, y: 0 };
+                    scale = 1;
+                    drawAllMaps();
                 });
                 
                 zoomControls.appendChild(zoomInBtn);
                 zoomControls.appendChild(zoomOutBtn);
+                zoomControls.appendChild(resetViewBtn);
                 container.appendChild(zoomControls);
                 
-                // Draw all maps
                 drawAllMaps();
+                
+                // Start camera update loop
+                updateCamera();
             }
             
             function drawAllMaps() {
@@ -819,8 +847,8 @@
             function resizeCanvases() {
                 maps.forEach((map, index) => {
                     if (canvases[index]) {
-                        canvases[index].width = map.width * map.tileSize * scale;
-                        canvases[index].height = map.height * map.tileSize * scale;
+                        canvases[index].width = window.innerWidth;
+                        canvases[index].height = window.innerHeight - 100; // Adjust for toolbar
                     }
                 });
                 drawAllMaps();
@@ -836,16 +864,29 @@
                     return;
                 }
                 
+                if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+                    // Middle button or Ctrl + left button for panning
+                    isDragging = true;
+                    dragStart.x = e.clientX;
+                    dragStart.y = e.clientY;
+                    canvas.style.cursor = "grabbing";
+                    return;
+                }
+                
                 isDrawing = true;
                 const rect = canvas.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
                 
-                const tileX = Math.floor(mouseX / (maps[mapIndex].tileSize * scale));
-                const tileY = Math.floor(mouseY / (maps[mapIndex].tileSize * scale));
+                // Translate screen coordinates to world coordinates
+                const worldX = mouseX / scale + cameraOffset.x;
+                const worldY = mouseY / scale + cameraOffset.y;
+                
+                const tileX = Math.floor(worldX / maps[mapIndex].tileSize);
+                const tileY = Math.floor(worldY / maps[mapIndex].tileSize);
                 
                 // Check if user clicked on a teleporter for linking
-                if (selectedTileType === 3 || tiles[tileY] && tiles[tileY][tileX] === 3) {
+                if (selectedTileType === 3 || (tiles[tileY] && tiles[tileY][tileX] === 3)) {
                     handleTeleporterClick(mapIndex, tileX, tileY);
                 } else {
                     setTileAt(tileX, tileY);
@@ -853,22 +894,77 @@
             }
             
             function handleMouseMove(e) {
-                if (!isDrawing) return;
-                
                 const canvas = e.target;
                 const mapIndex = parseInt(canvas.dataset.mapIndex);
                 const rect = canvas.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
                 
-                const tileX = Math.floor(mouseX / (maps[mapIndex].tileSize * scale));
-                const tileY = Math.floor(mouseY / (maps[mapIndex].tileSize * scale));
+                if (isDragging) {
+                    // Handle camera panning
+                    const dx = e.clientX - dragStart.x;
+                    const dy = e.clientY - dragStart.y;
+                    
+                    cameraOffset.x -= dx / scale;
+                    cameraOffset.y -= dy / scale;
+                    
+                    dragStart.x = e.clientX;
+                    dragStart.y = e.clientY;
+                    
+                    drawAllMaps();
+                    return;
+                }
+                
+                if (!isDrawing) return;
+                
+                // Don't allow continued drawing if we're in teleporter linking mode
+                if (isLinkingTeleporter) return;
+                
+                // Translate screen coordinates to world coordinates
+                const worldX = mouseX / scale + cameraOffset.x;
+                const worldY = mouseY / scale + cameraOffset.y;
+                
+                const tileX = Math.floor(worldX / maps[mapIndex].tileSize);
+                const tileY = Math.floor(worldY / maps[mapIndex].tileSize);
                 
                 setTileAt(tileX, tileY);
             }
             
+            function handleMouseUp(e) {
+                if (isDragging) {
+                    isDragging = false;
+                    e.target.style.cursor = "pointer";
+                }
+                
+                isDrawing = false;
+                
+                // Reset linking teleporter flag when mouse is released
+                if (isLinkingTeleporter) {
+                    isLinkingTeleporter = false;
+                }
+            }
+            
+            function handleMouseLeave(e) {
+                isDrawing = false;
+                if (isDragging) {
+                    isDragging = false;
+                    e.target.style.cursor = "pointer";
+                }
+            }
+            
             function handleWheel(e) {
                 e.preventDefault();
+                
+                const canvas = e.target;
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // Convert mouse position to world space before zoom
+                const worldXBefore = mouseX / scale + cameraOffset.x;
+                const worldYBefore = mouseY / scale + cameraOffset.y;
+                
+                // Adjust scale with zoom limits
                 const delta = Math.sign(e.deltaY);
                 if (delta < 0) {
                     scale = Math.min(scale + 0.1, 3);
@@ -876,7 +972,56 @@
                     scale = Math.max(scale - 0.1, 0.2);
                 }
                 
-                resizeCanvases();
+                // Convert mouse position to world space after zoom
+                const worldXAfter = mouseX / scale + cameraOffset.x;
+                const worldYAfter = mouseY / scale + cameraOffset.y;
+                
+                // Adjust camera offset to zoom toward/from mouse position
+                cameraOffset.x += worldXBefore - worldXAfter;
+                cameraOffset.y += worldYBefore - worldYAfter;
+                
+                drawAllMaps();
+            }
+            
+            function handleKeyDown(e) {
+                if (e.key.toLowerCase() === 'w') keys.w = true;
+                if (e.key.toLowerCase() === 'a') keys.a = true;
+                if (e.key.toLowerCase() === 's') keys.s = true;
+                if (e.key.toLowerCase() === 'd') keys.d = true;
+            }
+            
+            function handleKeyUp(e) {
+                if (e.key.toLowerCase() === 'w') keys.w = false;
+                if (e.key.toLowerCase() === 'a') keys.a = false;
+                if (e.key.toLowerCase() === 's') keys.s = false;
+                if (e.key.toLowerCase() === 'd') keys.d = false;
+            }
+            
+            function updateCamera() {
+                let moved = false;
+                
+                if (keys.w) {
+                    cameraOffset.y -= cameraSpeed / scale;
+                    moved = true;
+                }
+                if (keys.s) {
+                    cameraOffset.y += cameraSpeed / scale;
+                    moved = true;
+                }
+                if (keys.a) {
+                    cameraOffset.x -= cameraSpeed / scale;
+                    moved = true;
+                }
+                if (keys.d) {
+                    cameraOffset.x += cameraSpeed / scale;
+                    moved = true;
+                }
+                
+                if (moved) {
+                    drawAllMaps();
+                }
+                
+                requestAnimationFrame(updateCamera);
             }
             
             function switchToMap(index) {
@@ -959,6 +1104,9 @@
                         key: teleporterKey
                     };
                     
+                    // Set the linking flag to prevent continuous drawing
+                    isLinkingTeleporter = true;
+                    
                     // Highlight the selected teleporter
                     highlightTeleporter(mapIndex, tileX, tileY, true);
                     
@@ -969,6 +1117,7 @@
                 if (selectedTeleporter.key === teleporterKey) {
                     highlightTeleporter(selectedTeleporter.mapIndex, selectedTeleporter.x, selectedTeleporter.y, false);
                     selectedTeleporter = null;
+                    isLinkingTeleporter = false;
                     return;
                 }
                 
@@ -985,20 +1134,27 @@
                 // Clear the selection
                 highlightTeleporter(selectedTeleporter.mapIndex, selectedTeleporter.x, selectedTeleporter.y, false);
                 selectedTeleporter = null;
+                isLinkingTeleporter = false;
             }
             
             function highlightTeleporter(mapIndex, x, y, highlight) {
                 const ctx = contexts[mapIndex];
-                const tileSize = maps[mapIndex].tileSize * scale;
+                const mapData = maps[mapIndex];
+                
+                if (!ctx) return;
+                
+                const drawX = (x * mapData.tileSize - cameraOffset.x) * scale;
+                const drawY = (y * mapData.tileSize - cameraOffset.y) * scale;
+                const tileSize = mapData.tileSize * scale;
                 
                 // Redraw the tile
-                drawTile(x * tileSize, y * tileSize, tileSize, 3, ctx);
+                drawTile(drawX, drawY, tileSize, 3, ctx);
                 
                 // Add highlight if needed
                 if (highlight) {
                     ctx.strokeStyle = 'yellow';
                     ctx.lineWidth = 3;
-                    ctx.strokeRect(x * tileSize + 2, y * tileSize + 2, tileSize - 4, tileSize - 4);
+                    ctx.strokeRect(drawX + 2, drawY + 2, tileSize - 4, tileSize - 4);
                 }
             }
             
@@ -1136,40 +1292,51 @@
                 if (!mapTiles || mapTiles.length === 0) return;
 
                 const tileSize = mapData.tileSize * scale;
-                for (let y = 0; y < mapData.height; y++) {
-                    for (let x = 0; x < mapData.width; x++) {
-                        if (mapTiles[y] && typeof mapTiles[y][x] !== 'undefined') {
-                            const tileType = mapTiles[y][x];
-                        drawTile(
-                            x * tileSize,
-                            y * tileSize,
-                            tileSize,
-                            tileType,
-                                ctx
-                        );
+                
+                // Draw background grid
+                ctx.fillStyle = "#1a1a1a";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Calculate visible tile range based on camera offset
+                const startX = Math.floor(cameraOffset.x / mapData.tileSize);
+                const startY = Math.floor(cameraOffset.y / mapData.tileSize);
+                const endX = Math.ceil((cameraOffset.x + canvas.width / scale) / mapData.tileSize);
+                const endY = Math.ceil((cameraOffset.y + canvas.height / scale) / mapData.tileSize);
+                
+                // Draw visible tiles
+                for (let y = startY; y < endY; y++) {
+                    for (let x = startX; x < endX; x++) {
+                        if (y >= 0 && y < mapData.height && x >= 0 && x < mapData.width) {
+                            const tileType = mapTiles[y] && typeof mapTiles[y][x] !== 'undefined' ? mapTiles[y][x] : 0;
+                            const drawX = (x * mapData.tileSize - cameraOffset.x) * scale;
+                            const drawY = (y * mapData.tileSize - cameraOffset.y) * scale;
+                            
+                            drawTile(drawX, drawY, tileSize, tileType, ctx);
+                        }
                     }
-                }
                 }
                 
                 // Draw grid
                 ctx.strokeStyle = "#444";
                 ctx.lineWidth = 1;
 
-                for (let x = 0; x <= mapData.width; x++) {
+                for (let x = startX; x <= endX; x++) {
+                    const drawX = (x * mapData.tileSize - cameraOffset.x) * scale;
                     ctx.beginPath();
-                    ctx.moveTo(x * tileSize, 0);
-                    ctx.lineTo(x * tileSize, canvas.height);
+                    ctx.moveTo(drawX, 0);
+                    ctx.lineTo(drawX, canvas.height);
                     ctx.stroke();
                 }
 
-                for (let y = 0; y <= mapData.height; y++) {
+                for (let y = startY; y <= endY; y++) {
+                    const drawY = (y * mapData.tileSize - cameraOffset.y) * scale;
                     ctx.beginPath();
-                    ctx.moveTo(0, y * tileSize);
-                    ctx.lineTo(canvas.width, y * tileSize);
+                    ctx.moveTo(0, drawY);
+                    ctx.lineTo(canvas.width, drawY);
                     ctx.stroke();
                 }
                 
-                // Highlight any linked teleporters
+                // Highlight currently selected teleporter if any
                 if (selectedTeleporter && mapIndex !== selectedTeleporter.mapIndex) {
                     // Check if any teleporters in this map are linked to the selected one
                     if (mapData.teleporterLinks) {
@@ -1179,6 +1346,9 @@
                         
                         if (linkedTeleporter) {
                             const [_, x, y] = linkedTeleporter.fromKey.split(',').map(Number);
+                            const drawX = (x * mapData.tileSize - cameraOffset.x) * scale;
+                            const drawY = (y * mapData.tileSize - cameraOffset.y) * scale;
+                            
                             highlightTeleporter(mapIndex, x, y, true);
                         }
                     }
@@ -1246,41 +1416,44 @@
                         tiles[tileY] = [];
                     }
                     
-                    tiles[tileY][tileX] = selectedTileType;
+                    // Only update if the tile is different
+                    if (tiles[tileY][tileX] !== selectedTileType) {
+                        tiles[tileY][tileX] = selectedTileType;
 
-                    // Apply symmetric drawing if enabled
-                    if (symmetricDrawing) {
-                        // Calculate the center points for symmetry
-                        const centerX = Math.floor(maps[currentMapIndex].width / 2);
-                        const centerY = Math.floor(maps[currentMapIndex].height / 2);
+                        // Apply symmetric drawing if enabled
+                        if (symmetricDrawing) {
+                            // Calculate the center points for symmetry
+                            const centerX = Math.floor(maps[currentMapIndex].width / 2);
+                            const centerY = Math.floor(maps[currentMapIndex].height / 2);
 
-                        // Mirror positions
-                        const mirrorX = maps[currentMapIndex].width - 1 - tileX;
-                        const mirrorY = maps[currentMapIndex].height - 1 - tileY;
+                            // Mirror positions
+                            const mirrorX = maps[currentMapIndex].width - 1 - tileX;
+                            const mirrorY = maps[currentMapIndex].height - 1 - tileY;
 
-                        // Set mirrored tiles
-                        if (
-                            mirrorX >= 0 &&
-                            mirrorX < maps[currentMapIndex].width &&
-                            mirrorY >= 0 &&
-                            mirrorY < maps[currentMapIndex].height
-                        ) {
-                            // Ensure arrays exist
-                            if (!tiles[tileY]) tiles[tileY] = [];
-                            if (!tiles[mirrorY]) tiles[mirrorY] = [];
-                            
-                            // Mirror across X axis (vertical symmetry)
-                            tiles[tileY][mirrorX] = selectedTileType;
+                            // Set mirrored tiles
+                            if (
+                                mirrorX >= 0 &&
+                                mirrorX < maps[currentMapIndex].width &&
+                                mirrorY >= 0 &&
+                                mirrorY < maps[currentMapIndex].height
+                            ) {
+                                // Ensure arrays exist
+                                if (!tiles[tileY]) tiles[tileY] = [];
+                                if (!tiles[mirrorY]) tiles[mirrorY] = [];
+                                
+                                // Mirror across X axis (vertical symmetry)
+                                tiles[tileY][mirrorX] = selectedTileType;
 
-                            // Mirror across Y axis (horizontal symmetry)
-                            tiles[mirrorY][tileX] = selectedTileType;
+                                // Mirror across Y axis (horizontal symmetry)
+                                tiles[mirrorY][tileX] = selectedTileType;
 
-                            // Mirror across both axes (diagonal symmetry)
-                            tiles[mirrorY][mirrorX] = selectedTileType;
+                                // Mirror across both axes (diagonal symmetry)
+                                tiles[mirrorY][mirrorX] = selectedTileType;
+                            }
                         }
-                    }
 
-                    drawMap();
+                        drawMap();
+                    }
                     return true;
                 }
                 return false;
@@ -1968,6 +2141,10 @@
                             initMap();
                         }
                     });
+                
+                // Add keyboard support for WASD camera movement
+                document.addEventListener("keydown", handleKeyDown);
+                document.addEventListener("keyup", handleKeyUp);
                 
                 window.addEventListener("resize", () => {
                     resizeCanvases();

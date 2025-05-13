@@ -42,11 +42,11 @@
       },
       "void_crawler": {
         "count": 50,
-        "radius": 15,
+        "radius": 50,
         "minSpeed": 4,
         "maxSpeed": 6,
-        "turnIncrement": 0.5,
-        "homeRange": 200
+        "turnIncrement": 0.01,
+        "homeRange": 10
       },
       "wall": {
         "count": 0,

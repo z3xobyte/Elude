@@ -41,11 +41,11 @@
         "homeRange": 200
       },
       "void_crawler": {
-        "count": 0,
+        "count": 50,
         "radius": 15,
         "minSpeed": 4,
         "maxSpeed": 6,
-        "turnIncrement": 0.05,
+        "turnIncrement": 0.5,
         "homeRange": 200
       },
       "wall": {

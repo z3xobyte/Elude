@@ -5,10 +5,12 @@ export class Renderer {
     this.offscreenCanvas = document.createElement("canvas");
     this.offscreenCtx = this.offscreenCanvas.getContext("2d");
     this.tileRenderCache = new Map();
-    this.lastCamera = { x: 0, y: 0, width: 0, height: 0 };
+    this.lastCamera = { x: 0, y: 0, width: 0, height: 0, zoomFactor: 0 };
     this.dirtyCache = true;
     this.arrowSize = 20;
-    this.gridSubdivisions = 2;
+
+    this.tile_colors = ["#333333", "#ffffff", "#d3d3d3", "#fff17b", "#d3d3d3"];
+    this.default_tile_color = "#333333";
 
     this.setCanvasDimensions();
 
@@ -21,6 +23,25 @@ export class Renderer {
     this.cellSize = 256;
   }
 
+  _hexToRgb(hex) {
+    if (!hex || !hex.startsWith("#")) return null;
+    hex = hex.slice(1);
+    let r, g, b;
+    if (hex.length === 3) {
+        r = parseInt(hex[0] + hex[0], 16);
+        g = parseInt(hex[1] + hex[1], 16);
+        b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6) {
+        r = parseInt(hex.substring(0, 2), 16);
+        g = parseInt(hex.substring(2, 4), 16);
+        b = parseInt(hex.substring(4, 6), 16);
+    } else {
+        return null; 
+    }
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+    return { r, g, b };
+  }
+
   handleResize() {
     if (this.resizeTimeout) {
       clearTimeout(this.resizeTimeout);
@@ -28,6 +49,8 @@ export class Renderer {
 
     this.resizeTimeout = setTimeout(() => {
       this.setCanvasDimensions();
+      this.lastCamera.width = 0;
+      this.lastCamera.height = 0;
       this.dirtyCache = true;
     }, 100);
   }
@@ -140,7 +163,8 @@ export class Renderer {
       this.lastCamera.x !== camera.x ||
       this.lastCamera.y !== camera.y ||
       this.lastCamera.width !== camera.width ||
-      this.lastCamera.height !== camera.height;
+      this.lastCamera.height !== camera.height ||
+      this.lastCamera.zoomFactor !== camera.zoomFactor;
 
     const forceRedraw = !this.frameCount || this.frameCount < 5;
     this.frameCount = (this.frameCount || 0) + 1;
@@ -148,7 +172,7 @@ export class Renderer {
     if (cameraChanged || this.dirtyCache || forceRedraw) {
       this.lastCamera = { ...camera };
 
-      this.offscreenCtx.fillStyle = "#333";
+      this.offscreenCtx.fillStyle = this.tile_colors[0];
       this.offscreenCtx.fillRect(
         0,
         0,
@@ -156,184 +180,69 @@ export class Renderer {
         this.offscreenCanvas.height,
       );
 
-      this.drawTilesByType(
-        map,
-        mapWidth,
-        mapHeight,
-        tileSize,
-        camera,
-        1,
-        "white",
-        this.offscreenCtx,
-      );
-      this.drawTilesByType(
-        map,
-        mapWidth,
-        mapHeight,
-        tileSize,
-        camera,
-        2,
-        "darkgray",
-        this.offscreenCtx,
-      );
-      this.drawTilesByType(
-        map,
-        mapWidth,
-        mapHeight,
-        tileSize,
-        camera,
-        3,
-        "#ffdd7d",
-        this.offscreenCtx,
-      );
-      this.drawTilesByType(
-        map,
-        mapWidth,
-        mapHeight,
-        tileSize,
-        camera,
-        4,
-        "darkgray",
-        this.offscreenCtx,
-      );
+      const borderFraction = 1.5 / 40;
 
-      this.renderGridLines(
-        map,
-        mapWidth,
-        mapHeight,
-        tileSize,
-        camera,
-        this.offscreenCtx,
-      );
+      const visibleMinX = Math.max(0, Math.floor(camera.x / tileSize) - 2);
+      const visibleMaxX = Math.min(mapWidth -1 , Math.ceil((camera.x + camera.width) / tileSize) + 2);
+      const visibleMinY = Math.max(0, Math.floor(camera.y / tileSize) - 2);
+      const visibleMaxY = Math.min(mapHeight -1, Math.ceil((camera.y + camera.height) / tileSize) + 2);
+      
+      for (let y = visibleMinY; y <= visibleMaxY; y++) {
+        if (!map[y]) continue;
+        for (let x = visibleMinX; x <= visibleMaxX; x++) {
+          if (map[y][x] === undefined) continue;
+          
+          const tileType = map[y][x];
+          const color = this.tile_colors[tileType] || this.default_tile_color;
 
+          const worldX = x * tileSize;
+          const worldY = y * tileSize;
+          if (worldX + tileSize < camera.x || worldX > camera.x + camera.width ||
+              worldY + tileSize < camera.y || worldY > camera.y + camera.height) {
+          }
+
+          const screenPos = camera.worldToScreen(worldX, worldY);
+          const screenSize = tileSize * camera.zoomFactor;
+
+          this.offscreenCtx.fillStyle = color + "b0";
+          this.offscreenCtx.fillRect(
+            Math.floor(screenPos.x),
+            Math.floor(screenPos.y),
+            Math.ceil(screenSize),
+            Math.ceil(screenSize)
+          );
+
+          const borderVisualSize = screenSize * borderFraction;
+          this.offscreenCtx.fillStyle = color;
+          this.offscreenCtx.fillRect(
+            Math.floor(screenPos.x + borderVisualSize),
+            Math.floor(screenPos.y + borderVisualSize),
+            Math.ceil(screenSize - 2 * borderVisualSize),
+            Math.ceil(screenSize - 2 * borderVisualSize)
+          );
+
+          if (camera.zoomFactor < 1.0) {
+            const zoomOutOverlayAlpha = Math.max(0, Math.min(1, 1 - camera.zoomFactor * camera.zoomFactor));
+            if (zoomOutOverlayAlpha > 0.01) {
+                const rgbColor = this._hexToRgb(color);
+                if (rgbColor) {
+                    this.offscreenCtx.fillStyle = `rgba(${rgbColor.r},${rgbColor.g},${rgbColor.b},${zoomOutOverlayAlpha})`;
+                    this.offscreenCtx.fillRect(
+                        Math.floor(screenPos.x),
+                        Math.floor(screenPos.y),
+                        Math.ceil(screenSize),
+                        Math.ceil(screenSize)
+                    );
+                }
+            }
+          }
+        }
+      }
       this.dirtyCache = false;
     }
 
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
     this.ctx.drawImage(this.offscreenCanvas, 0, 0);
-  }
-
-  drawTilesByType(
-    map,
-    mapWidth,
-    mapHeight,
-    tileSize,
-    camera,
-    tileType,
-    color,
-    ctx,
-  ) {
-    const margin = 2;
-    const visibleMinX = Math.max(0, Math.floor(camera.x / tileSize) - margin);
-    const visibleMaxX = Math.min(
-      mapWidth - 1,
-      Math.ceil((camera.x + camera.width) / tileSize) + margin,
-    );
-    const visibleMinY = Math.max(0, Math.floor(camera.y / tileSize) - margin);
-    const visibleMaxY = Math.min(
-      mapHeight - 1,
-      Math.ceil((camera.y + camera.height) / tileSize) + margin,
-    );
-
-    ctx.fillStyle = color;
-
-    ctx.beginPath();
-    let tileCount = 0;
-
-    for (let y = visibleMinY; y <= visibleMaxY; y++) {
-      if (!map[y]) continue;
-
-      for (let x = visibleMinX; x <= visibleMaxX; x++) {
-        if (map[y][x] === tileType) {
-          const worldX = x * tileSize;
-          const worldY = y * tileSize;
-          const screenPos = camera.worldToScreen(worldX, worldY);
-          const screenSize = tileSize * camera.zoomFactor;
-
-          ctx.rect(
-            Math.floor(screenPos.x),
-            Math.floor(screenPos.y),
-            Math.ceil(screenSize),
-            Math.ceil(screenSize),
-          );
-
-          tileCount++;
-        }
-      }
-    }
-
-    if (tileCount > 0) {
-      ctx.fill();
-    }
-
-    if (tileType === 3 && tileCount > 0) {
-      ctx.save();
-      ctx.fillStyle = "#d1b255";
-      const fontSize = Math.floor(tileSize * 0.65 * camera.zoomFactor);
-      ctx.font = `${fontSize}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      for (let y = visibleMinY; y <= visibleMaxY; y++) {
-        if (!map[y]) continue;
-
-        for (let x = visibleMinX; x <= visibleMaxX; x++) {
-          if (map[y][x] === 3) {
-            const tileCenter = camera.worldToScreen(
-              x * tileSize + tileSize / 2,
-              y * tileSize + tileSize / 2,
-            );
-
-            ctx.fillText("➜", tileCenter.x, tileCenter.y);
-          }
-        }
-      }
-      ctx.restore();
-    }
-  }
-
-  renderTileType(
-    map,
-    mapWidth,
-    mapHeight,
-    tileSize,
-    camera,
-    tileType,
-    color,
-    targetCtx = this.ctx,
-  ) {
-    this.drawTilesByType(
-      map,
-      mapWidth,
-      mapHeight,
-      tileSize,
-      camera,
-      tileType,
-      color,
-      targetCtx,
-    );
-  }
-
-  renderContiguousAreas(
-    map,
-    mapWidth,
-    mapHeight,
-    tileSize,
-    camera,
-    tileType,
-    color,
-    targetCtx = this.ctx,
-  ) {
-    this.drawTilesByType(
-      map,
-      mapWidth,
-      mapHeight,
-      tileSize,
-      camera,
-      tileType,
-      color,
-      targetCtx,
-    );
   }
 
   renderPlayers(players, camera) {
@@ -349,9 +258,7 @@ export class Renderer {
 
     for (const [, player] of visiblePlayers) {
       if (!player) continue;
-
       const screenPos = camera.worldToScreen(player.x, player.y);
-
       const color = player.color || "white";
       if (!colorGroups.has(color)) {
         colorGroups.set(color, []);
@@ -361,67 +268,62 @@ export class Renderer {
         y: screenPos.y,
         radius: player.radius,
         isDead: player.isDead,
-        name: player.name, // Store name for rendering
+        name: player.name,
       });
     }
 
+    const deadPlayerStrokePath = new Path2D();
+    let hasAnyDeadPlayers = false;
+
     for (const [color, playersToDraw] of colorGroups) {
       this.ctx.fillStyle = color;
-      this.ctx.beginPath();
-      for (const p of playersToDraw) {
-        this.ctx.moveTo(p.x + p.radius, p.y);
-        this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-      }
-      this.ctx.fill();
-      
-      // Add gray outline for all players
-      this.ctx.strokeStyle = "#bdbdbd";
-      this.ctx.lineWidth = 2;
-      this.ctx.beginPath();
-      for (const p of playersToDraw) {
-        this.ctx.moveTo(p.x + p.radius, p.y);
-        this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-      }
-      this.ctx.stroke();
-    }
+      const livingPlayerFillPath = new Path2D();
+      const livingPlayerStrokePath = new Path2D();
+      let hasLivingInGroup = false;
 
-    this.ctx.strokeStyle = "#800000";
-    this.ctx.lineWidth = 2;
-    let hasDeadPlayerStrokes = false;
-    this.ctx.beginPath();
-
-    for (const [, playersToDraw] of colorGroups) {
       for (const p of playersToDraw) {
-        if (p.isDead) {
-          this.ctx.moveTo(p.x + p.radius, p.y);
-          this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-          hasDeadPlayerStrokes = true;
+        if (!p.isDead) {
+          livingPlayerFillPath.moveTo(p.x + p.radius, p.y);
+          livingPlayerFillPath.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          livingPlayerStrokePath.moveTo(p.x + p.radius, p.y);
+          livingPlayerStrokePath.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          hasLivingInGroup = true;
+        } else {
+          deadPlayerStrokePath.moveTo(p.x + p.radius, p.y);
+          deadPlayerStrokePath.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          hasAnyDeadPlayers = true;
         }
+      }
 
+      if (hasLivingInGroup) {
+        this.ctx.fill(livingPlayerFillPath);
+        this.ctx.strokeStyle = "#bdbdbd";
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke(livingPlayerStrokePath);
       }
     }
-    if (hasDeadPlayerStrokes) {
-      this.ctx.stroke();
+
+    if (hasAnyDeadPlayers) {
+      this.ctx.strokeStyle = "#800000";
+      this.ctx.lineWidth = 2;
+      this.ctx.stroke(deadPlayerStrokePath);
     }
     this.ctx.lineWidth = 1;
 
-    // Render player names
     this.ctx.textAlign = "center";
     this.ctx.font = 'bold 16px "Baloo Paaji 2", Arial, Helvetica, sans-serif';
     this.ctx.textBaseline = "bottom";
-    this.ctx.lineWidth = 2;
 
     for (const [, playersToDraw] of colorGroups) {
       for (const p of playersToDraw) {
         if (p.name) {
           const textX = p.x;
           const textY = p.y - p.radius - 5;
-
-          // Draw text outline
+          
+          this.ctx.lineWidth = 2;
           this.ctx.strokeStyle = "#bdbdbd";
           this.ctx.strokeText(p.name, textX, textY);
 
-          // Main text
           this.ctx.fillStyle = "#FFFFFF";
           this.ctx.fillText(p.name, textX, textY);
         }
@@ -512,11 +414,8 @@ export class Renderer {
     this.ctx.lineTo(-this.arrowSize / 2, -this.arrowSize * 0.7);
     this.ctx.closePath();
 
-    this.ctx.fillStyle = "#FFFFFF";
-    this.ctx.strokeStyle = "#bdbdbd";
+    this.ctx.strokeStyle = color;
     this.ctx.lineWidth = 2;
-
-    this.ctx.fill();
     this.ctx.stroke();
 
     this.ctx.restore();
@@ -661,116 +560,5 @@ export class Renderer {
     camera,
     targetCtx = this.ctx,
   ) {
-    const ctx = targetCtx;
-    const startCol = Math.max(0, Math.floor(camera.x / tileSize) - 1);
-    const endCol = Math.min(
-      mapWidth,
-      Math.floor((camera.x + camera.width) / tileSize) + 1,
-    );
-    const startRow = Math.max(0, Math.floor(camera.y / tileSize) - 1);
-    const endRow = Math.min(
-      mapHeight,
-      Math.floor((camera.y + camera.height) / tileSize) + 1,
-    );
-
-    const subTileSize = tileSize / this.gridSubdivisions;
-
-    ctx.save();
-    const gridColors = {
-      1: "#D7D7D7",
-      2: "#999999",
-      3: "#E6C26F",
-      4: "#999999",
-    };
-    for (let x = startCol; x <= endCol; x++) {
-      for (let subX = 0; subX <= this.gridSubdivisions; subX++) {
-        const isEdgeGridLine = subX === 0 || subX === this.gridSubdivisions;
-
-        const worldX = x * tileSize + subX * subTileSize;
-
-        for (let y = startRow; y < endRow; y++) {
-          const currentTileType =
-            map[y] && x >= 0 && x < mapWidth && y >= 0 && y < mapHeight
-              ? map[y][x]
-              : 0;
-          if (currentTileType === 0) continue;
-          if (currentTileType === 3 && !isEdgeGridLine) continue;
-          let rightTileType = 0;
-          if (subX === this.gridSubdivisions && x < mapWidth - 1) {
-            rightTileType =
-              map[y] && x + 1 >= 0 && x + 1 < mapWidth ? map[y][x + 1] : 0;
-          }
-
-          const isBoundary =
-            rightTileType !== 0 &&
-            rightTileType !== currentTileType &&
-            subX === this.gridSubdivisions;
-          const lineWidth = isBoundary ? 1 : 2;
-
-          ctx.beginPath();
-          ctx.lineWidth = lineWidth;
-          ctx.strokeStyle = gridColors[currentTileType] || "#D7D7D7";
-
-          const screenPosStart = camera.worldToScreen(worldX, y * tileSize);
-          const screenPosEnd = camera.worldToScreen(worldX, (y + 1) * tileSize);
-
-          ctx.moveTo(
-            Math.floor(screenPosStart.x) + 0.5,
-            Math.floor(screenPosStart.y),
-          );
-          ctx.lineTo(
-            Math.floor(screenPosEnd.x) + 0.5,
-            Math.floor(screenPosEnd.y),
-          );
-          ctx.stroke();
-        }
-      }
-    }
-    for (let y = startRow; y <= endRow; y++) {
-      for (let subY = 0; subY <= this.gridSubdivisions; subY++) {
-        const isEdgeGridLine = subY === 0 || subY === this.gridSubdivisions;
-
-        const worldY = y * tileSize + subY * subTileSize;
-
-        for (let x = startCol; x < endCol; x++) {
-          const currentTileType =
-            map[y] && x >= 0 && x < mapWidth && y >= 0 && y < mapHeight
-              ? map[y][x]
-              : 0;
-          if (currentTileType === 0) continue;
-          if (currentTileType === 3 && !isEdgeGridLine) continue;
-          let bottomTileType = 0;
-          if (subY === this.gridSubdivisions && y < mapHeight - 1) {
-            bottomTileType =
-              map[y + 1] && x >= 0 && x < mapWidth ? map[y + 1][x] : 0;
-          }
-
-          const isBoundary =
-            bottomTileType !== 0 &&
-            bottomTileType !== currentTileType &&
-            subY === this.gridSubdivisions;
-          const lineWidth = isBoundary ? 1 : 2;
-
-          ctx.beginPath();
-          ctx.lineWidth = lineWidth;
-          ctx.strokeStyle = gridColors[currentTileType] || "#D7D7D7";
-
-          const screenPosStart = camera.worldToScreen(x * tileSize, worldY);
-          const screenPosEnd = camera.worldToScreen((x + 1) * tileSize, worldY);
-
-          ctx.moveTo(
-            Math.floor(screenPosStart.x),
-            Math.floor(screenPosStart.y) + 0.5,
-          );
-          ctx.lineTo(
-            Math.floor(screenPosEnd.x),
-            Math.floor(screenPosEnd.y) + 0.5,
-          );
-          ctx.stroke();
-        }
-      }
-    }
-
-    ctx.restore();
   }
 }

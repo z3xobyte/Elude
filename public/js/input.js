@@ -52,7 +52,6 @@ export class Input {
   }
   
   cleanup() {
-
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = null;

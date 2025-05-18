@@ -53,10 +53,6 @@ const clientConfig = {
             ignore: ["**/js/**"],
           },
         },
-        {
-          from: "map_editor.html",
-          to: "../mapeditor.html",
-        },
       ],
     }),
   ],
@@ -68,13 +64,13 @@ const clientConfig = {
             new TerserPlugin({
               terserOptions: {
                 format: {
-                  comments: false, // Remove all comments
+                  comments: false,
                 },
                 compress: {
-                  drop_console: true, // Remove all console.* statements
+                  drop_console: true,
                 },
               },
-              extractComments: false, // Do not extract comments to separate files
+              extractComments: false,
             }),
           ],
         }

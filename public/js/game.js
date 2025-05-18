@@ -730,8 +730,7 @@ class Game {
       ) {
         this.camera.update(
           this.spectatorCameraX,
-          this.spectatorCameraY,
-          this.deltaTime,
+          this.spectatorCameraY
         );
       } else {
         // Fallback if spectator coords not set: center on first other player or map center
@@ -744,15 +743,13 @@ class Game {
         if (firstOtherPlayer && this.camera) {
           this.camera.update(
             firstOtherPlayer.x,
-            firstOtherPlayer.y,
-            this.deltaTime,
+            firstOtherPlayer.y
           );
         } else if (this.mapWidth > 0 && this.mapHeight > 0 && this.camera) {
           // map loaded
           this.camera.update(
             (this.mapWidth * this.tileSize) / 2,
-            (this.mapHeight * this.tileSize) / 2,
-            this.deltaTime,
+            (this.mapHeight * this.tileSize) / 2
           );
         }
       }
@@ -763,7 +760,7 @@ class Game {
     // If game is active for this player:
     const player = this.players.get(this.playerId);
     if (player && this.camera) {
-      this.camera.update(player.x, player.y, this.deltaTime);
+      this.camera.update(player.x, player.y);
     }
   }
 

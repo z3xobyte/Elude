@@ -1,3 +1,4 @@
+
 const { Enemy, Sniper, Dasher, Homing, VoidCrawler, Wall, RecursiveBulletBoss } = require('./enemy');
 
 class EnemySpawner {
@@ -221,7 +222,16 @@ class EnemySpawner {
               
           const wallsForThisRegion = Math.min(regionWallCount, maxWallsWithSpacing, count - wallsSpawned);
           
-          const actualSpacing = regionPerimeter / wallsForThisRegion;
+          // Calculate spacing based on perimeter segments
+          const topSegment = boundaryWidth;
+          const rightSegment = boundaryHeight;
+          const bottomSegment = boundaryWidth;
+          const leftSegment = boundaryHeight;
+          
+          // Distribute walls evenly across segments
+          const segmentLengths = [topSegment, rightSegment, bottomSegment, leftSegment];
+          const totalLength = segmentLengths.reduce((a, b) => a + b, 0);
+          const spacingPerWall = totalLength / wallsForThisRegion;
           
           const tempWalls = [];
           for (let i = 0; i < wallsForThisRegion; i++) {
@@ -242,7 +252,7 @@ class EnemySpawner {
               wallsForThisRegion,
               wallMoveClockwise,
               wallInitialSide,
-              actualSpacing
+              spacingPerWall // Use the evenly distributed spacing
             );
             
             tempWalls.push(wall);

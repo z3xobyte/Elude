@@ -1,0 +1,1978 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Map Editor</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+        <style>
+            :root {
+                --primary-color: #4a6fa5;
+                --secondary-color: #166088;
+                --accent-color: #47b8e0;
+                --dark-color: #121212;
+                --light-color: #f5f5f5;
+                --success-color: #48c774;
+                --warning-color: #ffdd57;
+                --danger-color: #f14668;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            }
+
+            body {
+                background-color: var(--dark-color);
+                color: var(--light-color);
+                overflow: hidden;
+                height: 100vh;
+                width: 100vw;
+                display: flex;
+                flex-direction: column;
+            }
+
+            #toolbar {
+                background-color: #1e1e1e;
+                padding: 10px;
+                display: flex;
+                gap: 10px;
+                border-bottom: 1px solid #333;
+            }
+
+            #tabs {
+                display: flex;
+                gap: 5px;
+                margin-right: 15px;
+                overflow-x: auto;
+                max-width: 300px;
+            }
+
+            .tab {
+                padding: 5px 10px;
+                background-color: #333;
+                border-radius: 4px;
+                cursor: pointer;
+                white-space: nowrap;
+                user-select: none;
+            }
+
+            .tab.active {
+                background-color: var(--primary-color);
+            }
+
+            .tab-add {
+                padding: 5px 10px;
+                background-color: #444;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+
+            .canvas-container {
+                flex: 1;
+                overflow: auto;
+                position: relative;
+                background-color: #2a2a2a;
+                display: flex;
+                justify-content: flex-start;
+                align-items: center;
+            }
+
+            .map-container {
+                display: inline-flex;
+                position: relative;
+                margin: 20px;
+            }
+
+            .map-label {
+                position: absolute;
+                top: -25px;
+                left: 0;
+                font-size: 14px;
+                color: var(--light-color);
+            }
+
+            #mapCanvas {
+                background-color: #333;
+                cursor: pointer;
+                box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            }
+
+            .tile-selector {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+
+            .tile {
+                width: 30px;
+                height: 30px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                transition: transform 0.1s;
+            }
+
+            .tile:hover {
+                transform: scale(1.05);
+            }
+
+            .tile.selected {
+                border: 2px solid var(--accent-color);
+                box-shadow: 0 0 8px var(--accent-color);
+            }
+
+            .tile-wall {
+                background-color: #333;
+                color: white;
+            }
+
+            .tile-floor {
+                background-color: #666;
+                color: white;
+            }
+
+            .tile-safe {
+                background-color: #48c774;
+                color: white;
+            }
+
+            .tile-teleporter {
+                background-color: #9c59b6;
+                color: white;
+            }
+
+            .tile-safe-no-spawn {
+                background-color: #48c774; /* Same as .tile-safe */
+                color: white;
+            }
+
+            .tile-safe-no-spawn {
+                background-color: #48c774; /* Same as .tile-safe */
+                color: white;
+            }
+
+            button {
+                background-color: #4a6fa5;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.9rem;
+            }
+
+            button:hover {
+                background-color: #166088;
+            }
+
+            .draw-options {
+                display: flex;
+                align-items: center;
+                margin-left: 15px;
+                color: var(--light-color);
+            }
+
+            .draw-options input[type="checkbox"] {
+                margin-right: 5px;
+            }
+
+            .spacer {
+                flex: 1;
+            }
+
+            #zoomControls {
+                position: absolute;
+                bottom: 20px;
+                right: 20px;
+                display: flex;
+                gap: 10px;
+            }
+
+            .zoom-btn {
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.5rem;
+                background-color: rgba(30, 30, 30, 0.8);
+                border-radius: 50%;
+            }
+
+            .dg.main {
+                margin-right: 15px;
+            }
+
+            .dg {
+                font-size: 12px;
+            }
+
+            .dg .c input[type="text"] {
+                line-height: normal;
+            }
+
+            .dg .c select {
+                margin-top: 2px;
+            }
+
+            .dg .cr.function .property-name {
+                width: 100%;
+            }
+
+            .dg li:not(.folder) {
+                height: 28px;
+                line-height: 28px;
+            }
+
+            .dg li.title {
+                padding-left: 16px;
+                height: 30px;
+                line-height: 30px;
+            }
+
+            .modal {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.7);
+                z-index: 1000;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .modal-content {
+                background-color: #252525;
+                padding: 20px;
+                border-radius: 8px;
+                width: 80%;
+                max-width: 800px;
+                max-height: 80vh;
+                overflow-y: auto;
+            }
+
+            .modal-title {
+                margin-bottom: 15px;
+                color: var(--accent-color);
+            }
+
+            pre,
+            textarea {
+                background-color: #333;
+                padding: 10px;
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 0.9rem;
+                width: 100%;
+                color: white;
+            }
+
+            pre {
+                white-space: pre-wrap;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+
+            textarea {
+                height: 300px;
+                border: 1px solid #444;
+                margin-top: 10px;
+            }
+
+            .button-group {
+                display: flex;
+                gap: 8px;
+                margin-top: 15px;
+                justify-content: flex-end;
+            }
+
+            .teleporter.selected {
+                border: 2px solid yellow;
+                box-shadow: 0 0 10px yellow;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="toolbar">
+            <div id="tabs">
+                <div class="tab active" data-index="0">Map 1</div>
+                <div class="tab-add">+</div>
+            </div>
+            <div class="tile-selector">
+                <span>Tile:</span>
+                <div class="tile tile-wall selected" data-tile-type="0">W</div>
+                <div class="tile tile-floor" data-tile-type="1">F</div>
+                <div class="tile tile-safe" data-tile-type="2">S</div>
+                <div class="tile tile-teleporter" data-tile-type="3">T</div>
+                <div class="tile tile-safe-no-spawn" data-tile-type="4">S-</div>
+            </div>
+            <div class="draw-options">
+                <label for="symmetricDrawing">
+                    <input type="checkbox" id="symmetricDrawing" />
+                    Symmetric Drawing
+                </label>
+            </div>
+            <div class="spacer"></div>
+            <button id="exportMapBtn">Export Current</button>
+            <button id="importMapBtn">Import Map</button>
+            <button id="clearMapBtn">Clear Current</button>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+            <!-- Map canvases will be added here dynamically -->
+        </div>
+
+        <div id="importExportModal" class="modal">
+            <div class="modal-content">
+                <h2 id="modalTitle" class="modal-title">Export Map</h2>
+                <pre id="jsonOutput"></pre>
+                <textarea id="jsonInput" style="display: none"></textarea>
+                <div class="button-group">
+                    <button id="copyJsonBtn">Copy to Clipboard</button>
+                    <button id="loadJsonBtn" style="display: none">
+                        Load Map
+                    </button>
+                    <button id="closeModalBtn">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="teleporterModal" class="modal">
+            <div class="modal-content" style="max-width: 400px">
+                <h2 class="modal-title">Teleporter Code</h2>
+                <div style="margin-bottom: 15px">
+                    <label
+                        for="teleporterCode"
+                        style="display: block; margin-bottom: 5px"
+                        >Code</label
+                    >
+                    <input
+                        type="text"
+                        id="teleporterCode"
+                        placeholder="map1_to_map2"
+                        style="
+                            width: 100%;
+                            padding: 8px;
+                            background: #333;
+                            color: white;
+                            border: 1px solid #444;
+                            border-radius: 4px;
+                        "
+                    />
+                </div>
+                <div style="margin-bottom: 15px">
+                    <label
+                        for="teleporterMapId"
+                        style="display: block; margin-bottom: 5px"
+                        >Map ID</label
+                    >
+                    <input
+                        type="text"
+                        id="teleporterMapId"
+                        placeholder="map1"
+                        style="
+                            width: 100%;
+                            padding: 8px;
+                            background: #333;
+                            color: white;
+                            border: 1px solid #444;
+                            border-radius: 4px;
+                        "
+                    />
+                </div>
+                <div class="button-group">
+                    <button id="saveTeleporterBtn">Save</button>
+                    <button id="cancelTeleporterBtn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Store multiple maps
+            let maps = [{
+                id: "map1",
+                width: 45,
+                height: 12,
+                tileSize: 80,
+                enemyConfig: {
+                    spawnTileType: 1,
+                    types: {
+                        basic: {
+                            count: 10,
+                            radius: 15,
+                            minSpeed: 5,
+                            maxSpeed: 8,
+                        },
+                        sniper: {
+                            count: 0,
+                            radius: 15,
+                            minSpeed: 3,
+                            maxSpeed: 5,
+                            detectionRange: 500,
+                            shootingRange: 400,
+                            maxShootCooldown: 100,
+                            bulletRadius: 5,
+                            bulletSpeed: 5,
+                        },
+                        dasher: {
+                            count: 0,
+                            radius: 15,
+                            minSpeed: 5,
+                            maxSpeed: 8,
+                            timeToPrepare: 750,
+                            timeToDash: 3000,
+                            timeBetweenDashes: 750,
+                        },
+                        homing: {
+                            count: 0,
+                            radius: 15,
+                            minSpeed: 4,
+                            maxSpeed: 6,
+                            turnIncrement: 0.05,
+                            homeRange: 200,
+                        },
+                        void_crawler: {
+                            count: 0,
+                            radius: 15,
+                            minSpeed: 4,
+                            maxSpeed: 6,
+                            turnIncrement: 0.05,
+                            homeRange: 200,
+                        },
+                        wall: {
+                            count: 0,
+                            radius: 15,
+                            minSpeed: 3,
+                            maxSpeed: 5,
+                            moveClockwise: true,
+                            patternAlternate: false,
+                            initialSide: 0,
+                        },
+                        recursive_bullet_boss: {
+                            count: 0,
+                            radius: 25,
+                            minSpeed: 2,
+                            maxSpeed: 4,
+                            shootCooldown: 120,
+                            bulletRadius: 8,
+                            bulletSpeed: 4,
+                            recursionLevels: 2
+                        },
+                    },
+                },
+                teleporterCodes: [],
+                teleporterLinks: [], // Store direct teleporter links
+                encodedMap: [],
+                tiles: []
+            }];
+            
+            let currentMapIndex = 0;
+            let selectedTeleporter = null; // For linking teleporters
+            
+            // Initialize variables
+            let scale = 1;
+            let tiles = [];
+            let canvases = [];
+            let contexts = [];
+            let selectedTileType = 0;
+            let currentTeleporterIndex = -1;
+            let isDrawing = false;
+            let symmetricDrawing = false;
+            const gui = new dat.GUI({ autoPlace: true, width: 350 });
+            gui.domElement.style.position = "absolute";
+            gui.domElement.style.top = "50px";
+            gui.domElement.style.right = "10px";
+            const mapSettingsFolder = gui.addFolder("Map Settings");
+            const mapSettings = {
+                width: 45,
+                height: 12,
+                tileSize: 80,
+                updateMap: () => {
+                    updateMapSettings();
+                },
+            };
+
+            // Add teleporter controls
+            const teleporterFolder = gui.addFolder("Teleporters");
+            const teleporterControls = {
+                teleporters: {},
+                addNew: () => {
+                    editTeleporter(-1);
+                },
+            };
+            teleporterFolder
+                .add(teleporterControls, "addNew")
+                .name("Add New Teleporter");
+            teleporterFolder.open();
+
+            mapSettingsFolder
+                .add(mapSettings, "width", 5, 100, 1)
+                .name("Width (tiles)");
+            mapSettingsFolder
+                .add(mapSettings, "height", 5, 100, 1)
+                .name("Height (tiles)");
+            mapSettingsFolder
+                .add(mapSettings, "tileSize", 20, 200, 5)
+                .name("Tile Size (px)");
+            mapSettingsFolder.add(mapSettings, "updateMap").name("Update Map");
+            mapSettingsFolder.open();
+
+            // Enemy Configuration
+            const enemyFolder = gui.addFolder("Enemy Spawner");
+
+            // Common enemy spawn settings
+            const spawnTypeController = enemyFolder
+                .add(maps[currentMapIndex].enemyConfig, "spawnTileType", {
+                    Floor: 1,
+                    "Safe Zone": 2,
+                })
+                .name("Spawn Tile Type");
+            spawnTypeController.onChange((value) => {
+                maps[currentMapIndex].enemyConfig.spawnTileType = parseInt(value);
+            });
+
+            // Enemy type selector
+            const enemyTypeConfig = {
+                selectedType: "basic",
+                types: Object.keys(maps[currentMapIndex].enemyConfig.types),
+            };
+
+            // Create the type dropdown
+            const enemyTypeController = enemyFolder
+                .add(enemyTypeConfig, "selectedType", enemyTypeConfig.types)
+                .name("Enemy Type");
+
+            // Dynamic config panel that changes based on selected type
+            const configFolder = enemyFolder.addFolder("Configuration");
+            let currentControllers = [];
+
+            // Function to update the configuration panel based on selected enemy type
+            function updateConfigPanel() {
+                // Remove existing controllers
+                currentControllers.forEach((controller) => controller.remove());
+                currentControllers = [];
+
+                const selectedType = enemyTypeConfig.selectedType;
+                const typeConfig = maps[currentMapIndex].enemyConfig.types[selectedType];
+
+                // Add common controllers
+                currentControllers.push(
+                    configFolder
+                        .add(typeConfig, "count", 0, 500, 1)
+                        .name("Count"),
+                );
+                currentControllers.push(
+                    configFolder
+                        .add(typeConfig, "radius", 5, 300, 1)
+                        .name("Radius"),
+                );
+                currentControllers.push(
+                    configFolder
+                        .add(typeConfig, "minSpeed", 1, 200, 1)
+                        .name("Min Speed"),
+                );
+                currentControllers.push(
+                    configFolder
+                        .add(typeConfig, "maxSpeed", 1, 200, 1)
+                        .name("Max Speed"),
+                );
+
+                // Add type-specific controllers
+                switch (selectedType) {
+                    case "sniper":
+                        currentControllers.push(
+                            configFolder
+                                .add(
+                                    typeConfig,
+                                    "detectionRange",
+                                    100,
+                                    1000,
+                                    50,
+                                )
+                                .name("Detection Range"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "shootingRange", 100, 1000, 50)
+                                .name("Shooting Range"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(
+                                    typeConfig,
+                                    "maxShootCooldown",
+                                    10,
+                                    5000,
+                                    10,
+                                )
+                                .name("Shoot Cooldown"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "bulletRadius", 2, 200, 1)
+                                .name("Bullet Radius"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "bulletSpeed", 1, 200, 1)
+                                .name("Bullet Speed"),
+                        );
+                        break;
+
+                    case "dasher":
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "timeToPrepare", 100, 2000, 50)
+                                .name("Time To Prepare (ms)"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "timeToDash", 500, 5000, 100)
+                                .name("Time To Dash (ms)"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(
+                                    typeConfig,
+                                    "timeBetweenDashes",
+                                    100,
+                                    2000,
+                                    50,
+                                )
+                                .name("Time Between Dashes (ms)"),
+                        );
+                        break;
+
+                    case "homing":
+                    case "void_crawler":
+                        currentControllers.push(
+                            configFolder
+                                .add(
+                                    typeConfig,
+                                    "turnIncrement",
+                                    0.01,
+                                    0.2,
+                                    0.01,
+                                )
+                                .name("Turn Increment"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "homeRange", 50, 5000, 10)
+                                .name("Home Range"),
+                        );
+                        break;
+
+                    case "wall":
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "moveClockwise")
+                                .name("Move Clockwise"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "patternAlternate")
+                                .name("Alternate Pattern"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "initialSide", {
+                                    Top: 0,
+                                    Right: 1,
+                                    Bottom: 2,
+                                    Left: 3,
+                                })
+                                .name("Initial Side"),
+                        );
+                        break;
+                        
+                    case "recursive_bullet_boss":
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "shootCooldown", 10, 500, 10)
+                                .name("Shoot Cooldown"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "bulletRadius", 2, 20, 1)
+                                .name("Bullet Radius"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "bulletSpeed", 1, 20, 1)
+                                .name("Bullet Speed"),
+                        );
+                        currentControllers.push(
+                            configFolder
+                                .add(typeConfig, "recursionLevels", 1, 5, 1)
+                                .name("Recursion Levels"),
+                        );
+                        break;
+                }
+            }
+
+            // Set up the onChange event for the type dropdown
+            enemyTypeController.onChange(updateConfigPanel);
+
+            // Initialize with the default selected type
+            updateConfigPanel();
+
+            enemyFolder.open();
+            configFolder.open();
+
+            function updateEnemyGuiControllers() {
+                // Update the type dropdown display
+                enemyTypeController.updateDisplay();
+
+                // Re-create the configuration panel
+                updateConfigPanel();
+            }
+
+            // Initialize canvases
+            function createCanvases() {
+                // Clear existing canvases
+                const container = document.getElementById("canvasContainer");
+                container.innerHTML = "";
+                canvases = [];
+                contexts = [];
+                
+                // Create a canvas for each map
+                maps.forEach((map, index) => {
+                    // Create container div for this map
+                    const mapContainer = document.createElement("div");
+                    mapContainer.className = "map-container";
+                    mapContainer.dataset.mapIndex = index;
+                    
+                    // Add map label
+                    const mapLabel = document.createElement("div");
+                    mapLabel.className = "map-label";
+                    mapLabel.textContent = map.id;
+                    mapContainer.appendChild(mapLabel);
+                    
+                    // Create canvas
+                    const canvas = document.createElement("canvas");
+                    canvas.className = "map-canvas";
+                    canvas.dataset.mapIndex = index;
+                    canvas.width = map.width * map.tileSize * scale;
+                    canvas.height = map.height * map.tileSize * scale;
+                    canvas.style.cursor = "pointer";
+                    
+                    // Add event listeners
+                    canvas.addEventListener("mousedown", handleMouseDown);
+                    canvas.addEventListener("mousemove", handleMouseMove);
+                    canvas.addEventListener("mouseup", () => isDrawing = false);
+                    canvas.addEventListener("mouseleave", () => isDrawing = false);
+                    canvas.addEventListener("wheel", handleWheel, { passive: false });
+                    
+                    mapContainer.appendChild(canvas);
+                    container.appendChild(mapContainer);
+                    
+                    const ctx = canvas.getContext("2d");
+                    canvases.push(canvas);
+                    contexts.push(ctx);
+                });
+                
+                // Create zoom controls
+                const zoomControls = document.createElement("div");
+                zoomControls.id = "zoomControls";
+                
+                const zoomInBtn = document.createElement("button");
+                zoomInBtn.className = "zoom-btn";
+                zoomInBtn.id = "zoomIn";
+                zoomInBtn.textContent = "+";
+                zoomInBtn.addEventListener("click", () => {
+                    scale = Math.min(scale + 0.1, 3);
+                    resizeCanvases();
+                });
+                
+                const zoomOutBtn = document.createElement("button");
+                zoomOutBtn.className = "zoom-btn";
+                zoomOutBtn.id = "zoomOut";
+                zoomOutBtn.textContent = "-";
+                zoomOutBtn.addEventListener("click", () => {
+                    scale = Math.max(scale - 0.1, 0.2);
+                    resizeCanvases();
+                });
+                
+                zoomControls.appendChild(zoomInBtn);
+                zoomControls.appendChild(zoomOutBtn);
+                container.appendChild(zoomControls);
+                
+                // Draw all maps
+                drawAllMaps();
+            }
+            
+            function drawAllMaps() {
+                maps.forEach((map, index) => {
+                    drawMap(index);
+                });
+            }
+            
+            function resizeCanvases() {
+                maps.forEach((map, index) => {
+                    if (canvases[index]) {
+                        canvases[index].width = map.width * map.tileSize * scale;
+                        canvases[index].height = map.height * map.tileSize * scale;
+                    }
+                });
+                drawAllMaps();
+            }
+            
+            function handleMouseDown(e) {
+                const canvas = e.target;
+                const mapIndex = parseInt(canvas.dataset.mapIndex);
+                
+                // Switch to this map if it's not the current one
+                if (mapIndex !== currentMapIndex) {
+                    switchToMap(mapIndex);
+                    return;
+                }
+                
+                isDrawing = true;
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const tileX = Math.floor(mouseX / (maps[mapIndex].tileSize * scale));
+                const tileY = Math.floor(mouseY / (maps[mapIndex].tileSize * scale));
+                
+                // Check if user clicked on a teleporter for linking
+                if (selectedTileType === 3 || tiles[tileY] && tiles[tileY][tileX] === 3) {
+                    handleTeleporterClick(mapIndex, tileX, tileY);
+                } else {
+                    setTileAt(tileX, tileY);
+                }
+            }
+            
+            function handleMouseMove(e) {
+                if (!isDrawing) return;
+                
+                const canvas = e.target;
+                const mapIndex = parseInt(canvas.dataset.mapIndex);
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const tileX = Math.floor(mouseX / (maps[mapIndex].tileSize * scale));
+                const tileY = Math.floor(mouseY / (maps[mapIndex].tileSize * scale));
+                
+                setTileAt(tileX, tileY);
+            }
+            
+            function handleWheel(e) {
+                e.preventDefault();
+                const delta = Math.sign(e.deltaY);
+                if (delta < 0) {
+                    scale = Math.min(scale + 0.1, 3);
+                } else {
+                    scale = Math.max(scale - 0.1, 0.2);
+                }
+                
+                resizeCanvases();
+            }
+            
+            function switchToMap(index) {
+                if (index < 0 || index >= maps.length) return;
+                
+                // Update UI
+                document.querySelectorAll(".tab").forEach(tab => {
+                    tab.classList.remove("active");
+                });
+                document.querySelector(`.tab[data-index="${index}"]`).classList.add("active");
+                
+                // Save current tiles to the current map
+                if (tiles.length > 0) {
+                    maps[currentMapIndex].tiles = [...tiles];
+                }
+                
+                // Update current map index
+                currentMapIndex = index;
+                
+                // Load tiles from the new map
+                tiles = maps[currentMapIndex].tiles.length > 0 
+                    ? [...maps[currentMapIndex].tiles] 
+                    : [];
+                
+                // Update GUI controllers
+                updateGUIForCurrentMap();
+                
+                // Highlight active map in the canvas area
+                document.querySelectorAll(".map-container").forEach((container, idx) => {
+                    if (idx === currentMapIndex) {
+                        container.style.border = "2px solid var(--accent-color)";
+                    } else {
+                        container.style.border = "none";
+                    }
+                });
+            }
+            
+            function updateGUIForCurrentMap() {
+                // Update map settings
+                mapSettings.width = maps[currentMapIndex].width;
+                mapSettings.height = maps[currentMapIndex].height;
+                mapSettings.tileSize = maps[currentMapIndex].tileSize;
+                
+                // Update GUI display
+                for (let i = 0; i < mapSettingsFolder.__controllers.length; i++) {
+                    mapSettingsFolder.__controllers[i].updateDisplay();
+                }
+                
+                // Update teleporter controls
+                updateTeleporterGUI();
+                
+                // Update enemy config
+                enemyTypeConfig.types = Object.keys(maps[currentMapIndex].enemyConfig.types);
+                spawnTypeController.setValue(maps[currentMapIndex].enemyConfig.spawnTileType);
+                
+                // Update enemy type controllers
+                updateEnemyGuiControllers();
+            }
+
+            function handleTeleporterClick(mapIndex, tileX, tileY) {
+                // Don't proceed if the clicked tile isn't a teleporter and we're not placing one
+                if (selectedTileType !== 3 && (!tiles[tileY] || tiles[tileY][tileX] !== 3)) {
+                    return;
+                }
+                
+                // If we're in teleporter placement mode, place the teleporter first
+                if (selectedTileType === 3 && (!tiles[tileY] || tiles[tileY][tileX] !== 3)) {
+                    setTileAt(tileX, tileY);
+                }
+                
+                // Create a teleporter object if it doesn't exist
+                const teleporterKey = `${mapIndex},${tileX},${tileY}`;
+                
+                // If no teleporter is selected, select this one
+                if (!selectedTeleporter) {
+                    selectedTeleporter = {
+                        mapIndex,
+                        x: tileX,
+                        y: tileY,
+                        key: teleporterKey
+                    };
+                    
+                    // Highlight the selected teleporter
+                    highlightTeleporter(mapIndex, tileX, tileY, true);
+                    
+                    return;
+                }
+                
+                // If this is the same teleporter as already selected, deselect it
+                if (selectedTeleporter.key === teleporterKey) {
+                    highlightTeleporter(selectedTeleporter.mapIndex, selectedTeleporter.x, selectedTeleporter.y, false);
+                    selectedTeleporter = null;
+                    return;
+                }
+                
+                // Link the two teleporters
+                createTeleporterLink(
+                    selectedTeleporter.mapIndex, 
+                    selectedTeleporter.x, 
+                    selectedTeleporter.y,
+                    mapIndex,
+                    tileX,
+                    tileY
+                );
+                
+                // Clear the selection
+                highlightTeleporter(selectedTeleporter.mapIndex, selectedTeleporter.x, selectedTeleporter.y, false);
+                selectedTeleporter = null;
+            }
+            
+            function highlightTeleporter(mapIndex, x, y, highlight) {
+                const ctx = contexts[mapIndex];
+                const tileSize = maps[mapIndex].tileSize * scale;
+                
+                // Redraw the tile
+                drawTile(x * tileSize, y * tileSize, tileSize, 3, ctx);
+                
+                // Add highlight if needed
+                if (highlight) {
+                    ctx.strokeStyle = 'yellow';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x * tileSize + 2, y * tileSize + 2, tileSize - 4, tileSize - 4);
+                }
+            }
+            
+            function createTeleporterLink(fromMapIndex, fromX, fromY, toMapIndex, toX, toY) {
+                // Create unique keys for the teleporters
+                const fromKey = `${fromMapIndex},${fromX},${fromY}`;
+                const toKey = `${toMapIndex},${toX},${toY}`;
+                
+                // Add teleporter link to both maps
+                if (!maps[fromMapIndex].teleporterLinks) maps[fromMapIndex].teleporterLinks = [];
+                if (!maps[toMapIndex].teleporterLinks) maps[toMapIndex].teleporterLinks = [];
+                
+                // Create the link objects
+                const fromLink = {
+                    fromKey,
+                    toKey,
+                    toMapIndex,
+                    toX,
+                    toY
+                };
+                
+                const toLink = {
+                    fromKey: toKey,
+                    toKey: fromKey,
+                    toMapIndex: fromMapIndex,
+                    toX: fromX,
+                    toY: fromY
+                };
+                
+                // Remove any existing links for these teleporters
+                maps[fromMapIndex].teleporterLinks = maps[fromMapIndex].teleporterLinks.filter(
+                    link => link.fromKey !== fromKey
+                );
+                
+                maps[toMapIndex].teleporterLinks = maps[toMapIndex].teleporterLinks.filter(
+                    link => link.fromKey !== toKey
+                );
+                
+                // Add the new links
+                maps[fromMapIndex].teleporterLinks.push(fromLink);
+                maps[toMapIndex].teleporterLinks.push(toLink);
+                
+                // Update the code and mapId for backwards compatibility
+                const teleporterCode = `${maps[fromMapIndex].id}_to_${maps[toMapIndex].id}`;
+                const reverseTeleporterCode = `${maps[toMapIndex].id}_to_${maps[fromMapIndex].id}`;
+                
+                // Find or create the teleporter in the teleporterCodes array
+                let fromTeleporterIndex = maps[fromMapIndex].teleporterCodes.findIndex(
+                    t => t.x === fromX && t.y === fromY
+                );
+                
+                if (fromTeleporterIndex === -1) {
+                    maps[fromMapIndex].teleporterCodes.push({
+                        code: teleporterCode,
+                        mapId: maps[toMapIndex].id,
+                        x: fromX,
+                        y: fromY
+                    });
+                } else {
+                    maps[fromMapIndex].teleporterCodes[fromTeleporterIndex].code = teleporterCode;
+                    maps[fromMapIndex].teleporterCodes[fromTeleporterIndex].mapId = maps[toMapIndex].id;
+                }
+                
+                let toTeleporterIndex = maps[toMapIndex].teleporterCodes.findIndex(
+                    t => t.x === toX && t.y === toY
+                );
+                
+                if (toTeleporterIndex === -1) {
+                    maps[toMapIndex].teleporterCodes.push({
+                        code: reverseTeleporterCode,
+                        mapId: maps[fromMapIndex].id,
+                        x: toX,
+                        y: toY
+                    });
+                } else {
+                    maps[toMapIndex].teleporterCodes[toTeleporterIndex].code = reverseTeleporterCode;
+                    maps[toMapIndex].teleporterCodes[toTeleporterIndex].mapId = maps[fromMapIndex].id;
+                }
+                
+                // Update teleporter GUI
+                updateTeleporterGUI();
+                
+                // Visual feedback
+                alert(`Teleporter linked: ${maps[fromMapIndex].id}(${fromX},${fromY}) → ${maps[toMapIndex].id}(${toX},${toY})`);
+            }
+
+            function initMap() {
+                maps[currentMapIndex].width = mapSettings.width;
+                maps[currentMapIndex].height = mapSettings.height;
+                maps[currentMapIndex].tileSize = mapSettings.tileSize;
+                tiles = [];
+                for (let y = 0; y < maps[currentMapIndex].height; y++) {
+                    const row = [];
+                    for (let x = 0; x < maps[currentMapIndex].width; x++) {
+                        if (
+                            x === 0 ||
+                            y === 0 ||
+                            x === maps[currentMapIndex].width - 1 ||
+                            y === maps[currentMapIndex].height - 1
+                        ) {
+                            row.push(0); // Wall
+                        } else {
+                            row.push(1); // Floor
+                        }
+                    }
+                    tiles.push(row);
+                }
+
+                // Update the map's tile data
+                maps[currentMapIndex].tiles = [...tiles];
+                
+                createCanvases();
+            }
+
+            function updateMapSettings() {
+                maps[currentMapIndex].width = mapSettings.width;
+                maps[currentMapIndex].height = mapSettings.height;
+                maps[currentMapIndex].tileSize = mapSettings.tileSize;
+                initMap();
+            }
+            
+            function resizeCanvas() {
+                resizeCanvases();
+            }
+            
+            function drawMap(mapIndex = currentMapIndex) {
+                const ctx = contexts[mapIndex];
+                if (!ctx) return;
+                
+                const canvas = canvases[mapIndex];
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                const mapData = maps[mapIndex];
+                const mapTiles = mapIndex === currentMapIndex ? tiles : mapData.tiles;
+                if (!mapTiles || mapTiles.length === 0) return;
+
+                const tileSize = mapData.tileSize * scale;
+                for (let y = 0; y < mapData.height; y++) {
+                    for (let x = 0; x < mapData.width; x++) {
+                        if (mapTiles[y] && typeof mapTiles[y][x] !== 'undefined') {
+                            const tileType = mapTiles[y][x];
+                        drawTile(
+                            x * tileSize,
+                            y * tileSize,
+                            tileSize,
+                            tileType,
+                                ctx
+                        );
+                    }
+                }
+                }
+                
+                // Draw grid
+                ctx.strokeStyle = "#444";
+                ctx.lineWidth = 1;
+
+                for (let x = 0; x <= mapData.width; x++) {
+                    ctx.beginPath();
+                    ctx.moveTo(x * tileSize, 0);
+                    ctx.lineTo(x * tileSize, canvas.height);
+                    ctx.stroke();
+                }
+
+                for (let y = 0; y <= mapData.height; y++) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y * tileSize);
+                    ctx.lineTo(canvas.width, y * tileSize);
+                    ctx.stroke();
+                }
+                
+                // Highlight any linked teleporters
+                if (selectedTeleporter && mapIndex !== selectedTeleporter.mapIndex) {
+                    // Check if any teleporters in this map are linked to the selected one
+                    if (mapData.teleporterLinks) {
+                        const linkedTeleporter = mapData.teleporterLinks.find(
+                            link => link.toKey === `${selectedTeleporter.mapIndex},${selectedTeleporter.x},${selectedTeleporter.y}`
+                        );
+                        
+                        if (linkedTeleporter) {
+                            const [_, x, y] = linkedTeleporter.fromKey.split(',').map(Number);
+                            highlightTeleporter(mapIndex, x, y, true);
+                        }
+                    }
+                }
+            }
+            
+            function drawTile(x, y, size, type, ctx = contexts[currentMapIndex]) {
+                switch (type) {
+                    case 0: // Wall
+                        ctx.fillStyle = "#333";
+                        break;
+                    case 1: // Floor
+                        ctx.fillStyle = "#666";
+                        break;
+                    case 2: // Safe zone
+                        ctx.fillStyle = "#48c774";
+                        break;
+                    case 3: // Teleporter
+                        ctx.fillStyle = "#9c59b6";
+                        break;
+                    case 4: // Safe zone (no spawn)
+                        ctx.fillStyle = "#48c774"; // Same color as type 2
+                        break;
+                    default:
+                        ctx.fillStyle = "#ff0000";
+                }
+
+                ctx.fillRect(x, y, size, size);
+                ctx.fillStyle = "#fff";
+                ctx.font = `${Math.floor(size / 3)}px Arial`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                let text = "";
+                switch (type) {
+                    case 0:
+                        text = "W";
+                        break;
+                    case 1:
+                        text = "F";
+                        break;
+                    case 2:
+                        text = "S";
+                        break;
+                    case 3:
+                        text = "T";
+                        break;
+                    case 4:
+                        text = "S-";
+                        break;
+                }
+
+                ctx.fillText(text, x + size / 2, y + size / 2);
+            }
+            
+            function setTileAt(tileX, tileY) {
+                if (
+                    tileX >= 0 &&
+                    tileX < maps[currentMapIndex].width &&
+                    tileY >= 0 &&
+                    tileY < maps[currentMapIndex].height
+                ) {
+                    // Ensure tiles array is initialized properly
+                    if (!tiles[tileY]) {
+                        tiles[tileY] = [];
+                    }
+                    
+                    tiles[tileY][tileX] = selectedTileType;
+
+                    // Apply symmetric drawing if enabled
+                    if (symmetricDrawing) {
+                        // Calculate the center points for symmetry
+                        const centerX = Math.floor(maps[currentMapIndex].width / 2);
+                        const centerY = Math.floor(maps[currentMapIndex].height / 2);
+
+                        // Mirror positions
+                        const mirrorX = maps[currentMapIndex].width - 1 - tileX;
+                        const mirrorY = maps[currentMapIndex].height - 1 - tileY;
+
+                        // Set mirrored tiles
+                        if (
+                            mirrorX >= 0 &&
+                            mirrorX < maps[currentMapIndex].width &&
+                            mirrorY >= 0 &&
+                            mirrorY < maps[currentMapIndex].height
+                        ) {
+                            // Ensure arrays exist
+                            if (!tiles[tileY]) tiles[tileY] = [];
+                            if (!tiles[mirrorY]) tiles[mirrorY] = [];
+                            
+                            // Mirror across X axis (vertical symmetry)
+                            tiles[tileY][mirrorX] = selectedTileType;
+
+                            // Mirror across Y axis (horizontal symmetry)
+                            tiles[mirrorY][tileX] = selectedTileType;
+
+                            // Mirror across both axes (diagonal symmetry)
+                            tiles[mirrorY][mirrorX] = selectedTileType;
+                        }
+                    }
+
+                    drawMap();
+                    return true;
+                }
+                return false;
+            }
+            
+            function encodeMap() {
+                const encoded = [];
+                let currentValue = tiles[0][0];
+                let count = 0;
+
+                for (let y = 0; y < maps[currentMapIndex].height; y++) {
+                    for (let x = 0; x < maps[currentMapIndex].width; x++) {
+                        const value = tiles[y] && typeof tiles[y][x] !== 'undefined' ? tiles[y][x] : 1;
+
+                        if (value === currentValue) {
+                            count++;
+                        } else {
+                            encoded.push(currentValue, count);
+                            currentValue = value;
+                            count = 1;
+                        }
+                    }
+                }
+                encoded.push(currentValue, count);
+
+                return encoded;
+            }
+            
+            function decodeMap(encoded) {
+                const map = [];
+                let rowIndex = 0;
+                let colIndex = 0;
+                const width = maps[currentMapIndex].width;
+                const height = maps[currentMapIndex].height;
+
+                for (let i = 0; i < encoded.length; i += 2) {
+                    const value = encoded[i];
+                    const count = encoded[i + 1];
+
+                    if (!map[rowIndex]) {
+                        map[rowIndex] = [];
+                    }
+
+                    for (let j = 0; j < count; j++) {
+                        map[rowIndex][colIndex] = value;
+                        colIndex++;
+
+                        if (colIndex >= width) {
+                            colIndex = 0;
+                            rowIndex++;
+                            if (rowIndex < height && !map[rowIndex]) {
+                                map[rowIndex] = [];
+                            }
+                        }
+                    }
+                }
+
+                return map;
+            }
+            
+            function exportMap() {
+                // Save current tiles to the current map
+                maps[currentMapIndex].tiles = [...tiles];
+                
+                // Create encoded map
+                maps[currentMapIndex].encodedMap = encodeMap();
+                
+                // Update dimensions
+                maps[currentMapIndex].width = mapSettings.width;
+                maps[currentMapIndex].height = mapSettings.height;
+                maps[currentMapIndex].tileSize = mapSettings.tileSize;
+
+                // Export the current map
+                return JSON.stringify(maps[currentMapIndex], null, 2);
+            }
+            
+            function exportAllMaps() {
+                // Save current tiles to the current map
+                maps[currentMapIndex].tiles = [...tiles];
+                
+                // Make sure all maps have encoded data
+                maps.forEach((map, index) => {
+                    // Temporarily switch to this map's context to encode it
+                    const originalIndex = currentMapIndex;
+                    currentMapIndex = index;
+                    
+                    // Save the tiles
+                    const tempTiles = [...tiles];
+                    tiles = [...map.tiles];
+                    
+                    // Encode the map
+                    map.encodedMap = encodeMap();
+                    
+                    // Restore original context
+                    tiles = tempTiles;
+                    currentMapIndex = originalIndex;
+                });
+                
+                // Export all maps
+                return JSON.stringify(maps, null, 2);
+            }
+            
+            function importMap(jsonData) {
+                try {
+                    const data = JSON.parse(jsonData);
+
+                    // Check if this is a single map or multiple maps
+                    if (Array.isArray(data)) {
+                        // This is multiple maps - replace all maps
+                        importMultipleMaps(data);
+                    } else {
+                        // This is a single map - add or update
+                        importSingleMap(data);
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    alert("Error importing map: " + error.message);
+                    console.error(error);
+                    return false;
+                }
+            }
+            
+            function importMultipleMaps(mapList) {
+                // Replace all maps with the imported ones
+                maps = mapList.map(map => {
+                    // Handle mapData structure updates for each map
+                    ensureMapDataStructure(map);
+                    return map;
+                });
+                
+                // Recreate tabs
+                updateAllTabs();
+                
+                // Switch to the first map
+                switchToMap(0);
+                
+                // Recreate canvases
+                createCanvases();
+            }
+            
+            function importSingleMap(mapData) {
+                    // Handle mapData structure updates
+                ensureMapDataStructure(mapData);
+                
+                // Check if a map with this ID already exists
+                const existingMapIndex = maps.findIndex(m => m.id === mapData.id);
+                
+                if (existingMapIndex !== -1) {
+                    // Update existing map
+                    maps[existingMapIndex] = mapData;
+                    
+                    // If the current map was updated, reload it
+                    if (existingMapIndex === currentMapIndex) {
+                        mapSettings.width = mapData.width;
+                        mapSettings.height = mapData.height;
+                        mapSettings.tileSize = mapData.tileSize;
+                        
+                        // Update GUI controllers
+                        updateGUIForCurrentMap();
+                        
+                        // Decode the map
+                        tiles = mapData.tiles && mapData.tiles.length > 0 
+                            ? [...mapData.tiles] 
+                            : decodeMap(mapData.encodedMap);
+                            
+                        // Store the decoded tiles
+                        maps[currentMapIndex].tiles = [...tiles];
+                    }
+                } else {
+                    // Add as a new map
+                    maps.push(mapData);
+                    
+                    // Create a new tab
+                    createMapTab(maps.length - 1, mapData.id);
+                    
+                    // Switch to the new map
+                    switchToMap(maps.length - 1);
+                }
+                
+                // Recreate canvases
+                createCanvases();
+            }
+            
+            function ensureMapDataStructure(mapData) {
+                // Set default ID if missing
+                if (!mapData.id) {
+                    mapData.id = `map${maps.length + 1}`;
+                }
+                
+                // Handle mapData structure updates
+                if (!mapData.enemyConfig.types) {
+                        // Convert old format to new format
+                    mapData.enemyConfig = {
+                        spawnTileType: mapData.enemyConfig.spawnTileType || 1,
+                            types: {
+                                basic: {
+                                count: mapData.enemyConfig.count || 10,
+                                radius: mapData.enemyConfig.radius || 15,
+                                minSpeed: mapData.enemyConfig.minSpeed || 5,
+                                maxSpeed: mapData.enemyConfig.maxSpeed || 8,
+                                },
+                                sniper: {
+                                    count: 0,
+                                    radius: 15,
+                                    minSpeed: 3,
+                                    maxSpeed: 5,
+                                    detectionRange: 500,
+                                    shootingRange: 400,
+                                    maxShootCooldown: 100,
+                                    bulletRadius: 5,
+                                    bulletSpeed: 5,
+                                },
+                                dasher: {
+                                    count: 0,
+                                    radius: 15,
+                                    minSpeed: 5,
+                                    maxSpeed: 8,
+                                    timeToPrepare: 750,
+                                    timeToDash: 3000,
+                                    timeBetweenDashes: 750,
+                                },
+                                homing: {
+                                    count: 0,
+                                    radius: 15,
+                                    minSpeed: 4,
+                                    maxSpeed: 6,
+                                    turnIncrement: 0.05,
+                                    homeRange: 200,
+                                },
+                                void_crawler: {
+                                    count: 0,
+                                    radius: 15,
+                                    minSpeed: 4,
+                                    maxSpeed: 6,
+                                    turnIncrement: 0.05,
+                                    homeRange: 200,
+                                },
+                                wall: {
+                                    count: 0,
+                                    radius: 15,
+                                    minSpeed: 3,
+                                    maxSpeed: 5,
+                                    moveClockwise: true,
+                                    patternAlternate: false,
+                                    initialSide: 0,
+                                },
+                                recursive_bullet_boss: {
+                                    count: 0,
+                                    radius: 25,
+                                    minSpeed: 2,
+                                    maxSpeed: 4,
+                                    shootCooldown: 120,
+                                    bulletRadius: 8,
+                                    bulletSpeed: 4,
+                                    recursionLevels: 2
+                                },
+                            },
+                        };
+                    }
+
+                    // Ensure all enemy types exist
+                    const requiredTypes = [
+                        "basic",
+                        "sniper",
+                        "dasher",
+                        "homing",
+                        "void_crawler",
+                        "wall",
+                        "recursive_bullet_boss"
+                    ];
+                
+                    requiredTypes.forEach((type) => {
+                    if (!mapData.enemyConfig.types[type]) {
+                        mapData.enemyConfig.types[type] = maps[0].enemyConfig.types[type];
+                    }
+                });
+                
+                // Initialize teleporter links if missing
+                if (!mapData.teleporterLinks) {
+                    mapData.teleporterLinks = [];
+                }
+                
+                // Initialize tiles array if missing
+                if (!mapData.tiles || !mapData.tiles.length) {
+                    if (mapData.encodedMap && mapData.encodedMap.length) {
+                        // Temporarily set as current to decode
+                        const originalIndex = currentMapIndex;
+                        currentMapIndex = maps.findIndex(m => m.id === mapData.id);
+                        if (currentMapIndex === -1) currentMapIndex = originalIndex;
+                        
+                        mapData.tiles = decodeMap(mapData.encodedMap);
+                        
+                        // Restore original index
+                        currentMapIndex = originalIndex;
+                    } else {
+                        // Create empty tiles
+                        const newTiles = [];
+                        for (let y = 0; y < mapData.height; y++) {
+                            const row = [];
+                            for (let x = 0; x < mapData.width; x++) {
+                                if (
+                                    x === 0 ||
+                                    y === 0 ||
+                                    x === mapData.width - 1 ||
+                                    y === mapData.height - 1
+                                ) {
+                                    row.push(0); // Wall
+                                } else {
+                                    row.push(1); // Floor
+                                }
+                            }
+                            newTiles.push(row);
+                        }
+                        mapData.tiles = newTiles;
+                    }
+                }
+                
+                return mapData;
+            }
+
+            function updateTeleporterGUI() {
+                // Clear existing teleporter controllers
+                for (const key in teleporterControls.teleporters) {
+                    if (teleporterFolder.__controllers) {
+                        const controller = teleporterFolder.__controllers.find(
+                            (c) => c.property === key,
+                        );
+                        if (controller) {
+                            controller.remove();
+                        }
+                    }
+                    delete teleporterControls.teleporters[key];
+                }
+                
+                // Add controllers for teleporter codes for backward compatibility
+                maps[currentMapIndex].teleporterCodes.forEach((teleporter, index) => {
+                    const controlKey = `teleporter${index}`;
+                    teleporterControls.teleporters[controlKey] = () => {
+                        editTeleporter(index);
+                    };
+                    teleporterFolder
+                        .add(teleporterControls.teleporters, controlKey)
+                        .name(`${teleporter.code} → ${teleporter.mapId}`);
+                });
+                
+                // Add controllers for teleporter links
+                if (maps[currentMapIndex].teleporterLinks) {
+                    maps[currentMapIndex].teleporterLinks.forEach((link, index) => {
+                        const [fromMapIndex, fromX, fromY] = link.fromKey.split(',').map(Number);
+                        const [toMapIndex, toX, toY] = link.toKey.split(',').map(Number);
+                        
+                        const controlKey = `link${index}`;
+                        teleporterControls.teleporters[controlKey] = () => {
+                            // Highlight the teleporters when clicked
+                            if (canvases[fromMapIndex] && contexts[fromMapIndex]) {
+                                highlightTeleporter(fromMapIndex, fromX, fromY, true);
+                            }
+                            
+                            if (canvases[toMapIndex] && contexts[toMapIndex]) {
+                                highlightTeleporter(toMapIndex, toX, toY, true);
+                            }
+                            
+                            // Clear highlight after a short delay
+                            setTimeout(() => {
+                                if (canvases[fromMapIndex] && contexts[fromMapIndex]) {
+                                    drawMap(fromMapIndex);
+                                }
+                                
+                                if (canvases[toMapIndex] && contexts[toMapIndex]) {
+                                    drawMap(toMapIndex);
+                                }
+                            }, 1000);
+                        };
+                        
+                        const toMapName = maps[toMapIndex] ? maps[toMapIndex].id : 'unknown';
+                        teleporterFolder
+                            .add(teleporterControls.teleporters, controlKey)
+                            .name(`Link: (${fromX},${fromY}) → ${toMapName}(${toX},${toY})`);
+                    });
+                }
+            }
+
+            function editTeleporter(index) {
+                currentTeleporterIndex = index;
+
+                if (index !== -1) {
+                    const teleporter = maps[currentMapIndex].teleporterCodes[index];
+                    document.getElementById("teleporterCode").value = teleporter.code;
+                    document.getElementById("teleporterMapId").value = teleporter.mapId;
+                } else {
+                    document.getElementById("teleporterCode").value = "";
+                    document.getElementById("teleporterMapId").value = "";
+                }
+
+                document.getElementById("teleporterModal").style.display = "flex";
+            }
+            
+            function saveTeleporter() {
+                const code = document.getElementById("teleporterCode").value.trim();
+                const mapId = document.getElementById("teleporterMapId").value.trim();
+
+                if (!code || !mapId) {
+                    alert("Code and Map ID are required");
+                    return;
+                }
+
+                const teleporter = { code, mapId };
+
+                if (currentTeleporterIndex === -1) {
+                    maps[currentMapIndex].teleporterCodes.push(teleporter);
+                } else {
+                    maps[currentMapIndex].teleporterCodes[currentTeleporterIndex] = teleporter;
+                }
+                updateTeleporterGUI();
+
+                document.getElementById("teleporterModal").style.display = "none";
+            }
+            
+            // Functions for tab management
+            function createNewMap() {
+                // Create a new map with default settings
+                const newMapId = `map${maps.length + 1}`;
+                const newMap = {
+                    id: newMapId,
+                    width: 45,
+                    height: 12,
+                    tileSize: 80,
+                    enemyConfig: {
+                        spawnTileType: 1,
+                        types: {
+                            basic: {
+                                count: 10,
+                                radius: 15,
+                                minSpeed: 5,
+                                maxSpeed: 8,
+                            },
+                            sniper: {
+                                count: 0,
+                                radius: 15,
+                                minSpeed: 3,
+                                maxSpeed: 5,
+                                detectionRange: 500,
+                                shootingRange: 400,
+                                maxShootCooldown: 100,
+                                bulletRadius: 5,
+                                bulletSpeed: 5,
+                            },
+                            dasher: {
+                                count: 0,
+                                radius: 15,
+                                minSpeed: 5,
+                                maxSpeed: 8,
+                                timeToPrepare: 750,
+                                timeToDash: 3000,
+                                timeBetweenDashes: 750,
+                            },
+                            homing: {
+                                count: 0,
+                                radius: 15,
+                                minSpeed: 4,
+                                maxSpeed: 6,
+                                turnIncrement: 0.05,
+                                homeRange: 200,
+                            },
+                            void_crawler: {
+                                count: 0,
+                                radius: 15,
+                                minSpeed: 4,
+                                maxSpeed: 6,
+                                turnIncrement: 0.05,
+                                homeRange: 200,
+                            },
+                            wall: {
+                                count: 0,
+                                radius: 15,
+                                minSpeed: 3,
+                                maxSpeed: 5,
+                                moveClockwise: true,
+                                patternAlternate: false,
+                                initialSide: 0,
+                            },
+                            recursive_bullet_boss: {
+                                count: 0,
+                                radius: 25,
+                                minSpeed: 2,
+                                maxSpeed: 4,
+                                shootCooldown: 120,
+                                bulletRadius: 8,
+                                bulletSpeed: 4,
+                                recursionLevels: 2
+                            },
+                        },
+                    },
+                    teleporterCodes: [],
+                    teleporterLinks: [],
+                    encodedMap: [],
+                    tiles: []
+                };
+                
+                // Initialize the tiles for the new map
+                const newTiles = [];
+                for (let y = 0; y < newMap.height; y++) {
+                    const row = [];
+                    for (let x = 0; x < newMap.width; x++) {
+                        if (
+                            x === 0 ||
+                            y === 0 ||
+                            x === newMap.width - 1 ||
+                            y === newMap.height - 1
+                        ) {
+                            row.push(0); // Wall
+                        } else {
+                            row.push(1); // Floor
+                        }
+                    }
+                    newTiles.push(row);
+                }
+                newMap.tiles = newTiles;
+                
+                // Add the new map to the maps array
+                maps.push(newMap);
+                
+                // Create a new tab for the map
+                createMapTab(maps.length - 1, newMapId);
+                
+                // Switch to the new map
+                switchToMap(maps.length - 1);
+                
+                // Recreate the canvases to include the new map
+                createCanvases();
+            }
+            
+            function createMapTab(index, mapId) {
+                const tabsContainer = document.getElementById("tabs");
+                const tabAddButton = document.querySelector(".tab-add");
+                
+                // Create the new tab
+                const newTab = document.createElement("div");
+                newTab.className = "tab";
+                newTab.dataset.index = index;
+                newTab.textContent = mapId;
+                
+                // Add click event listener
+                newTab.addEventListener("click", () => {
+                    switchToMap(index);
+                });
+                
+                // Insert before the add button
+                tabsContainer.insertBefore(newTab, tabAddButton);
+            }
+            
+            function updateAllTabs() {
+                const tabsContainer = document.getElementById("tabs");
+                
+                // Clear existing tabs except the add button
+                tabsContainer.innerHTML = "";
+                
+                // Recreate tabs for each map
+                maps.forEach((map, index) => {
+                    const tab = document.createElement("div");
+                    tab.className = "tab" + (index === currentMapIndex ? " active" : "");
+                    tab.dataset.index = index;
+                    tab.textContent = map.id;
+                    
+                    tab.addEventListener("click", () => {
+                        switchToMap(index);
+                    });
+                    
+                    tabsContainer.appendChild(tab);
+                });
+                
+                // Add the add button
+                const addButton = document.createElement("div");
+                addButton.className = "tab-add";
+                addButton.textContent = "+";
+                addButton.addEventListener("click", createNewMap);
+                tabsContainer.appendChild(addButton);
+            }
+            
+            function deleteCurrentMap() {
+                if (maps.length <= 1) {
+                    alert("Cannot delete the only map.");
+                    return;
+                }
+                
+                if (confirm(`Are you sure you want to delete ${maps[currentMapIndex].id}?`)) {
+                    // Remove the map
+                    maps.splice(currentMapIndex, 1);
+                    
+                    // Switch to the previous map or the first one
+                    const newIndex = Math.max(0, currentMapIndex - 1);
+                    
+                    // Update tabs
+                    updateAllTabs();
+                    
+                    // Switch to the new map
+                    switchToMap(newIndex);
+                    
+                    // Recreate canvases
+                    createCanvases();
+                }
+            }
+
+            window.addEventListener("DOMContentLoaded", () => {
+                // Initialize the first map with walls and floor
+                initMap();
+                
+                // Update the tabs
+                updateAllTabs();
+                
+                document.querySelectorAll(".tile").forEach((tile) => {
+                    tile.addEventListener("click", (e) => {
+                        document
+                            .querySelectorAll(".tile")
+                            .forEach((t) => t.classList.remove("selected"));
+                        e.target.classList.add("selected");
+                        selectedTileType = parseInt(e.target.dataset.tileType);
+                    });
+                });
+
+                // Symmetric drawing checkbox event
+                document
+                    .getElementById("symmetricDrawing")
+                    .addEventListener("change", (e) => {
+                        symmetricDrawing = e.target.checked;
+                    });
+
+                // Add event listener for the tab add button
+                document.querySelector(".tab-add").addEventListener("click", createNewMap);
+                
+                document.getElementById("exportMapBtn").addEventListener("click", () => {
+                    const jsonOutput = document.getElementById("jsonOutput");
+                    jsonOutput.textContent = exportMap();
+
+                    document.getElementById("modalTitle").textContent = "Export Map";
+                    document.getElementById("jsonOutput").style.display = "block";
+                    document.getElementById("jsonInput").style.display = "none";
+                    document.getElementById("copyJsonBtn").style.display = "inline-block";
+                    document.getElementById("loadJsonBtn").style.display = "none";
+
+                    document.getElementById("importExportModal").style.display = "flex";
+                });
+                
+                document.getElementById("importMapBtn").addEventListener("click", () => {
+                    document.getElementById("modalTitle").textContent = "Import Map";
+                    document.getElementById("jsonOutput").style.display = "none";
+                    document.getElementById("jsonInput").style.display = "block";
+                    document.getElementById("copyJsonBtn").style.display = "none";
+                    document.getElementById("loadJsonBtn").style.display = "inline-block";
+
+                    document.getElementById("importExportModal").style.display = "flex";
+                });
+                
+                document.getElementById("copyJsonBtn").addEventListener("click", () => {
+                    const jsonOutput = document.getElementById("jsonOutput");
+                    navigator.clipboard.writeText(jsonOutput.textContent)
+                            .then(() => {
+                                alert("JSON copied to clipboard");
+                            })
+                            .catch((err) => {
+                                console.error("Failed to copy: ", err);
+                            });
+                    });
+                
+                document.getElementById("loadJsonBtn").addEventListener("click", () => {
+                        const jsonInput = document.getElementById("jsonInput");
+                        if (importMap(jsonInput.value)) {
+                        document.getElementById("importExportModal").style.display = "none";
+                    }
+                });
+                
+                document.getElementById("closeModalBtn").addEventListener("click", () => {
+                    document.getElementById("importExportModal").style.display = "none";
+                });
+                
+                document.getElementById("saveTeleporterBtn").addEventListener("click", saveTeleporter);
+                
+                document.getElementById("cancelTeleporterBtn").addEventListener("click", () => {
+                    document.getElementById("teleporterModal").style.display = "none";
+                });
+                
+                document.getElementById("clearMapBtn").addEventListener("click", () => {
+                    if (confirm(`Are you sure you want to clear ${maps[currentMapIndex].id}?`)) {
+                            initMap();
+                        }
+                    });
+                
+                window.addEventListener("resize", () => {
+                    resizeCanvases();
+                });
+            });
+        </script>
+    </body>
+</html>

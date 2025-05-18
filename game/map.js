@@ -12,7 +12,7 @@ class MapManager {
   }
 
   loadMaps() {
-    const mapFiles = ['map1'];
+    const mapFiles = ['map1','map2'];
     
     mapFiles.forEach(mapId => {
       const binaryMapPath = path.join(__dirname, 'maps', `${mapId}.bmap`);

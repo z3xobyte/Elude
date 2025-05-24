@@ -142,7 +142,7 @@
                 right: 10px;
                 display: flex;
                 gap: 10px;
-                z-index: 1000; /* Below menu, but above canvas */
+                z-index: 1002; /* Increased z-index to be above the menu */
             }
 
             #fpsDisplay {
@@ -150,9 +150,9 @@
                 color: white;
                 font-family: "Baloo Paaji 2", "Courier New", monospace;
                 font-size: 14px;
-                background-color: rgba(0, 0, 0, 0.5);
                 padding: 5px 10px;
                 border-radius: 3px;
+                text-shadow: -1px -1px 0 #808080, 1px -1px 0 #808080, -1px 1px 0 #808080, 1px 1px 0 #808080; /* Changed to darker gray outline */
             }
 
             #ping {
@@ -163,9 +163,33 @@
                 color: white;
                 font-family: "Baloo Paaji 2", "Courier New", monospace;
                 font-size: 14px;
-                background-color: rgba(0, 0, 0, 0.5);
                 padding: 5px 10px;
                 border-radius: 3px;
+                text-shadow: -1px -1px 0 #808080, 1px -1px 0 #808080, -1px 1px 0 #808080, 1px 1px 0 #808080; /* Changed to darker gray outline */
+            }
+
+            /* Styles for the new checkbox */
+            .checkbox-container {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+
+            .checkbox-container input[type="checkbox"] {
+                width: 16px;
+                height: 16px;
+                accent-color: #007bff; /* Or any color you prefer for the checkmark */
+            }
+
+            .checkbox-container label {
+                font-family: "Baloo Paaji 2", "Ubuntu", Arial, Helvetica, sans-serif;
+                font-weight: 700;
+                font-size: 14px;
+                color: #ffffff;
+                text-shadow: -1px -1px 0 #808080, 1px -1px 0 #808080, -1px 1px 0 #808080, 1px 1px 0 #808080; /* Changed to darker gray outline */
+                cursor: pointer;
             }
 
             /* Chat styles adapted from provided CSS */
@@ -312,6 +336,10 @@
         <div id="indicators">
             <div id="fpsDisplay">FPS: --</div>
             <div id="ping">Ping: -- ms</div>
+            <div class="checkbox-container">
+                <input type="checkbox" id="disableIntroCheckbox">
+                <label for="disableIntroCheckbox">Disable Intro</label>
+            </div>
         </div>
 
         <!-- Chat Area -->

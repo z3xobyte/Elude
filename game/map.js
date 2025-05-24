@@ -12,59 +12,59 @@ class MapManager {
   }
 
   loadMaps() {
-    const mapFiles = ['map1','map2','map3','map4','map5','map6'];
-    
-    mapFiles.forEach(mapId => {
-      const binaryMapPath = path.join(__dirname, 'maps', `${mapId}.bmap`);
-      const jsonMapPath = path.join(__dirname, 'maps', `${mapId}.json`);
+    const mapsDir = path.join(__dirname, 'maps');
+    let files;
+    try {
+      files = fs.readdirSync(mapsDir);
+    } catch (error) {
+      console.error(`Error reading maps directory ${mapsDir}:`, error);
+      return;
+    }
+
+    const discoveredMapIds = new Set();
+    files.forEach(file => {
+      if (file.endsWith('.json') || file.endsWith('.bmap')) {
+        discoveredMapIds.add(path.parse(file).name);
+      }
+    });
+
+    discoveredMapIds.forEach(mapId => {
+      const binaryMapPath = path.join(mapsDir, `${mapId}.bmap`);
+      const jsonMapPath = path.join(mapsDir, `${mapId}.json`);
       
+      let mapData;
+      let loadedFromBinary = false;
+      let loadedFromJson = false;
+
       try {
         if (this.useBinaryMaps && fs.existsSync(binaryMapPath)) {
           console.log(`Loading binary map from: ${binaryMapPath}`);
           const startTime = Date.now();
           
-          const mapData = BinaryMapEncoder.loadBinaryMap(binaryMapPath);
-          mapData.mapId = mapId;
+          mapData = BinaryMapEncoder.loadBinaryMap(binaryMapPath);
+          mapData.mapId = mapId; // Ensure mapId is set
           
-          this.maps[mapId] = new Map(mapData);
+          this.maps[mapId] = new Map(mapData); // Map is GameMap from mapLogic.js
           
           const loadTime = Date.now() - startTime;
           console.log(`Binary map ${mapId} loaded successfully in ${loadTime}ms`);
-          
-          // Check for teleporter links and ensure they're properly associated
-          if (mapData.teleporterLinks && mapData.teleporterLinks.length > 0) {
-            console.log(`Map ${mapId} has ${mapData.teleporterLinks.length} teleporter links`);
-            
-            // Make sure the teleporter links are passed to the teleporter manager
-            if (this.maps[mapId].teleporterManager && typeof this.maps[mapId].teleporterManager.setTeleporterLinks === 'function') {
-              this.maps[mapId].teleporterManager.setTeleporterLinks(mapData.teleporterLinks);
-            }
-          }
+          loadedFromBinary = true;
         } 
-        else {
+        else if (fs.existsSync(jsonMapPath)) {
           console.log(`Loading JSON map from: ${jsonMapPath}`);
           const startTime = Date.now();
           
           const fileContent = fs.readFileSync(jsonMapPath, 'utf8');
-          const mapData = JSON.parse(fileContent);
-          mapData.mapId = mapId;
+          mapData = JSON.parse(fileContent);
+          mapData.mapId = mapId; // Ensure mapId is set
           
-          this.maps[mapId] = new Map(mapData);
+          this.maps[mapId] = new Map(mapData); // Map is GameMap from mapLogic.js
           
           const loadTime = Date.now() - startTime;
           console.log(`JSON map ${mapId} loaded successfully in ${loadTime}ms`);
+          loadedFromJson = true;
           
-          // Check for teleporter links
-          if (mapData.teleporterLinks && mapData.teleporterLinks.length > 0) {
-            console.log(`Map ${mapId} has ${mapData.teleporterLinks.length} teleporter links`);
-            
-            // Make sure the teleporter links are passed to the teleporter manager
-            if (this.maps[mapId].teleporterManager && typeof this.maps[mapId].teleporterManager.setTeleporterLinks === 'function') {
-              this.maps[mapId].teleporterManager.setTeleporterLinks(mapData.teleporterLinks);
-            }
-          }
-          
-          if (this.useBinaryMaps) {
+          if (this.useBinaryMaps && mapData) { // mapData will be populated if JSON loading was successful
             try {
               const binarySize = BinaryMapEncoder.saveBinaryMap(mapData, binaryMapPath);
               console.log(`Converted ${mapId} to binary format (${binarySize} bytes)`);
@@ -72,7 +72,19 @@ class MapManager {
               console.error(`Error converting map ${mapId} to binary:`, conversionError);
             }
           }
+        } else {
+          console.warn(`No map file found for mapId: ${mapId} (looked for .bmap and .json)`);
+          return; // Skip this mapId if no file is found
         }
+
+        // Common logic for teleporter links after map is loaded
+        if (this.maps[mapId] && mapData && mapData.teleporterLinks && mapData.teleporterLinks.length > 0) {
+          console.log(`Map ${mapId} has ${mapData.teleporterLinks.length} teleporter links`);
+          if (this.maps[mapId].teleporterManager && typeof this.maps[mapId].teleporterManager.setTeleporterLinks === 'function') {
+            this.maps[mapId].teleporterManager.setTeleporterLinks(mapData.teleporterLinks);
+          }
+        }
+
       } catch (error) {
         console.error(`Error loading map ${mapId}:`, error);
       }
@@ -103,23 +115,6 @@ class MapManager {
   }
 }
 
-class MapBackwardCompatibility {
-  constructor() {
-    const mapDataPath = path.join(__dirname, 'maps', 'map1.json');
-    console.log(`Loading backward compatibility map from: ${mapDataPath}`);
-    try {
-      const fileContent = fs.readFileSync(mapDataPath, 'utf8');
-      const mapData = JSON.parse(fileContent);
-      mapData.mapId = 'map1';
-      return new Map(mapData);
-    } catch (error) {
-      console.error("Error in MapBackwardCompatibility:", error);
-      return null;
-    }
-  }
-}
-
 module.exports = { 
-  MapManager, 
-  Map: MapBackwardCompatibility 
+  MapManager 
 }; 

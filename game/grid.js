@@ -7,15 +7,17 @@ class Grid {
   static ANGLES_SIN_12 = [];
 
   static {
-    for (let i = 0; i < Grid.NUM_POINTS_8; i++) {
-      const angle = (i / Grid.NUM_POINTS_8) * Math.PI * 2;
-      Grid.ANGLES_COS_8.push(Math.cos(angle));
-      Grid.ANGLES_SIN_8.push(Math.sin(angle));
-    }
-    for (let i = 0; i < Grid.NUM_POINTS_12; i++) {
-      const angle = (i / Grid.NUM_POINTS_12) * Math.PI * 2;
-      Grid.ANGLES_COS_12.push(Math.cos(angle));
-      Grid.ANGLES_SIN_12.push(Math.sin(angle));
+    const RAYS = [
+      { numPoints: Grid.NUM_POINTS_8, cosArray: Grid.ANGLES_COS_8, sinArray: Grid.ANGLES_SIN_8 },
+      { numPoints: Grid.NUM_POINTS_12, cosArray: Grid.ANGLES_COS_12, sinArray: Grid.ANGLES_SIN_12 },
+    ];
+
+    for (const ray of RAYS) {
+      for (let i = 0; i < ray.numPoints; i++) {
+        const angle = (i / ray.numPoints) * Math.PI * 2;
+        ray.cosArray.push(Math.cos(angle));
+        ray.sinArray.push(Math.sin(angle));
+      }
     }
   }
 
@@ -58,14 +60,14 @@ class Grid {
   }
 
   getCellIndex(x, y) {
-    const cellX = Math.min(this.maxCellX, Math.max(0, ~~(x * this.inverseCellSize)));
-    const cellY = Math.min(this.maxCellY, Math.max(0, ~~(y * this.inverseCellSize)));
+    const cellX = Math.min(this.maxCellX, ~~(x * this.inverseCellSize));
+    const cellY = Math.min(this.maxCellY, ~~(y * this.inverseCellSize));
     return cellX * this.cellsY + cellY;
   }
 
   getCellCoords(x, y) {
-    const cellX = Math.min(this.maxCellX, Math.max(0, ~~(x * this.inverseCellSize)));
-    const cellY = Math.min(this.maxCellY, Math.max(0, ~~(y * this.inverseCellSize)));
+    const cellX = Math.min(this.maxCellX, ~~(x * this.inverseCellSize));
+    const cellY = Math.min(this.maxCellY, ~~(y * this.inverseCellSize));
     return { x: cellX, y: cellY };
   }
 
@@ -144,10 +146,10 @@ class Grid {
     const entityId = entity.id;
     
     // Calculate cell range using min/max helpers for bounds checking
-    const minX = Math.max(0, Math.min(this.maxCellX, ~~((entity.x - entityRadius) * this.inverseCellSize)));
-    const minY = Math.max(0, Math.min(this.maxCellY, ~~((entity.y - entityRadius) * this.inverseCellSize)));
-    const maxX = Math.max(0, Math.min(this.maxCellX, ~~((entity.x + entityRadius) * this.inverseCellSize)));
-    const maxY = Math.max(0, Math.min(this.maxCellY, ~~((entity.y + entityRadius) * this.inverseCellSize)));
+    const minX = Math.min(this.maxCellX, ~~((entity.x - entityRadius) * this.inverseCellSize));
+    const minY = Math.min(this.maxCellY, ~~((entity.y - entityRadius) * this.inverseCellSize));
+    const maxX = Math.min(this.maxCellX, ~~((entity.x + entityRadius) * this.inverseCellSize));
+    const maxY = Math.min(this.maxCellY, ~~((entity.y + entityRadius) * this.inverseCellSize));
 
     const cellIndices = [];
     const cellsYCount = this.cellsY;
@@ -214,10 +216,10 @@ class Grid {
     const currentCells = this.cells;
 
     // Calculate new cell range with efficient bounds checking
-    const newMinX = Math.max(0, Math.min(this.maxCellX, ~~((entity.x - entityRadius) * this.inverseCellSize)));
-    const newMinY = Math.max(0, Math.min(this.maxCellY, ~~((entity.y - entityRadius) * this.inverseCellSize)));
-    const newMaxX = Math.max(0, Math.min(this.maxCellX, ~~((entity.x + entityRadius) * this.inverseCellSize)));
-    const newMaxY = Math.max(0, Math.min(this.maxCellY, ~~((entity.y + entityRadius) * this.inverseCellSize)));
+    const newMinX = Math.min(this.maxCellX, ~~((entity.x - entityRadius) * this.inverseCellSize));
+    const newMinY = Math.min(this.maxCellY, ~~((entity.y - entityRadius) * this.inverseCellSize));
+    const newMaxX = Math.min(this.maxCellX, ~~((entity.x + entityRadius) * this.inverseCellSize));
+    const newMaxY = Math.min(this.maxCellY, ~~((entity.y + entityRadius) * this.inverseCellSize));
 
     // Fast path: if position hasn't changed cell membership
     if (
@@ -320,8 +322,8 @@ class Grid {
     const radiusInCells = Math.ceil(checkRadius * invCellSize);
 
     // Calculate test bounds with efficient clamping
-    const minTestCellX = Math.max(0, Math.min(this.maxCellX, entityCellX - radiusInCells));
-    const minTestCellY = Math.max(0, Math.min(this.maxCellY, entityCellY - radiusInCells));
+    const minTestCellX = Math.min(this.maxCellX, entityCellX - radiusInCells);
+    const minTestCellY = Math.min(this.maxCellY, entityCellY - radiusInCells);
     const maxTestCellX = Math.max(0, Math.min(this.maxCellX, entityCellX + radiusInCells));
     const maxTestCellY = Math.max(0, Math.min(this.maxCellY, entityCellY + radiusInCells));
 
@@ -407,10 +409,10 @@ class Grid {
     const cellsYCount = this.cellsY;
 
     // Calculate boundaries with efficient clamping
-    const minX = Math.max(0, Math.min(this.maxCellX, ~~((x - entityRadius) * invCellSize)));
-    const minY = Math.max(0, Math.min(this.maxCellY, ~~((y - entityRadius) * invCellSize)));
-    const maxX = Math.max(0, Math.min(this.maxCellX, ~~((x + entityRadius) * invCellSize)));
-    const maxY = Math.max(0, Math.min(this.maxCellY, ~~((y + entityRadius) * invCellSize)));
+    const minX = Math.min(this.maxCellX, ~~((x - entityRadius) * invCellSize));
+    const minY = Math.min(this.maxCellY, ~~((y - entityRadius) * invCellSize));
+    const maxX = Math.min(this.maxCellX, ~~((x + entityRadius) * invCellSize));
+    const maxY = Math.min(this.maxCellY, ~~((y + entityRadius) * invCellSize));
 
     const entityIds = new Set();
     const currentCells = this.cells;
@@ -549,10 +551,10 @@ class Grid {
     const cellsYCount = this.cellsY;
 
     // More efficient cell range calculation
-    const minX = Math.max(0, Math.min(this.maxCellX, ~~((x - radius) * invCellSize)));
-    const minY = Math.max(0, Math.min(this.maxCellY, ~~((y - radius) * invCellSize)));
-    const maxX = Math.max(0, Math.min(this.maxCellX, ~~((x + radius) * invCellSize)));
-    const maxY = Math.max(0, Math.min(this.maxCellY, ~~((y + radius) * invCellSize)));
+    const minX = Math.min(this.maxCellX, ~~((x - radius) * invCellSize));
+    const minY = Math.min(this.maxCellY, ~~((y - radius) * invCellSize));
+    const maxX = Math.min(this.maxCellX, ~~((x + radius) * invCellSize));
+    const maxY = Math.min(this.maxCellY, ~~((y + radius) * invCellSize));
 
     // Pre-compute squared test radius for distance checks
     const testRadiusSq = (radius + Math.sqrt(2) * (this.cellSize / 2)) ** 2;

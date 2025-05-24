@@ -39,6 +39,8 @@ class Game {
     this.nameInputElement = document.getElementById("name");
     this.playButtonElement = document.getElementById("play");
     this.statusElement = document.getElementById("status");
+    this.disableIntroCheckbox = document.getElementById("disableIntroCheckbox");
+    this.disableIntroCheckboxContainer = this.disableIntroCheckbox ? this.disableIntroCheckbox.parentElement : null; // Get container
 
     this.camera = new Camera(this.canvas.width, this.canvas.height);
     console.log("Camera initialized:", this.camera);
@@ -70,6 +72,18 @@ class Game {
     if (this.input) {
       this.input.disableMovement(); // Ensure input class also knows movement is initially off
     }
+
+    // Load preference from localStorage
+    if (this.disableIntroCheckbox) {
+        const savedPreference = localStorage.getItem('disableIntro');
+        if (savedPreference === 'true') {
+            this.disableIntroCheckbox.checked = true;
+        }
+        // Update localStorage when checkbox changes
+        this.disableIntroCheckbox.addEventListener('change', (event) => {
+            localStorage.setItem('disableIntro', event.target.checked);
+        });
+    }
   }
 
   setupNameInput() {
@@ -88,21 +102,35 @@ class Game {
       if (name && name.length > 0 && name.length <= 16) {
         this.playerName = name;
         
-        // Instead of directly calling the intro animation method, use the new class
-        const introAnimation = new IntroAnimation({
-          playerName: this.playerName,
-          onComplete: () => {
+        const playAction = () => {
             this.isGameActive = true;
             this.playerDataConfirmed = false;
-            console.log("Intro animation finished. Joining game...");
+            console.log("Joining game...");
             this.network.send({ type: "joinGame", name: this.playerName });
             if (this.input) this.input.disableMovement();
             this.isMovementEnabled = false;
-          }
-        });
-        
-        introAnimation.start();
+            // Hide the checkbox container when game starts
+            if (this.disableIntroCheckboxContainer) {
+                this.disableIntroCheckboxContainer.style.display = 'none';
+            }
+        };
 
+        if (this.disableIntroCheckbox && this.disableIntroCheckbox.checked) {
+            // If checkbox is checked, skip intro
+            console.log("Intro animation skipped by user preference.");
+            playAction();
+        } else {
+            // Otherwise, play intro animation
+            const introAnimation = new IntroAnimation({
+              playerName: this.playerName,
+              onComplete: () => {
+                console.log("Intro animation finished.");
+                playAction();
+              }
+            });
+            introAnimation.start();
+        }
+        
         this.menuElement.style.display = "none";
         this.statusElement.textContent = "";
 
